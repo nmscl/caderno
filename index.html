@@ -2512,4 +2512,38 @@ action=async function(el){const a=el.dataset.action;if(a==='local-backup-all'||a
 document.addEventListener('change',event=>{if(event.target.matches('[data-local-backup-user]'))ui.localBackupIds=[...document.querySelectorAll('[data-local-backup-user]:checked')].map(node=>node.dataset.localBackupUser);});
 
 start();
-</script></body></html>
+</script>
+HTML
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+  // Configuração da nova base de dados Firebase (caderno-9c817)
+  const firebaseConfig = {
+    apiKey: "AIzaSyBSNuVhkenYLYafNUQGkflOO5bLt8kdsv0",
+    authDomain: "caderno-9c817.firebaseapp.com",
+    projectId: "caderno-9c817",
+    storageBucket: "caderno-9c817.firebasestorage.app",
+    messagingSenderId: "857977758052",
+    appId: "1:857977758052:web:a8516fbd20a36273439a71"
+  };
+
+  // Inicializar o Firebase diretamente sem depender de /__/firebase/init.json
+  let app, db, auth;
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+
+    // Autenticação anónima para permitir leitura e escrita imediata na base de dados
+    signInAnonymously(auth).then(() => {
+      console.log("Firebase conectado com sucesso ao projeto caderno-9c817");
+    }).catch(err => {
+      console.warn("Aviso de autenticação anónima:", err);
+    });
+  } catch (e) {
+    console.error("Erro ao inicializar o Firebase:", e);
+  }
+</script>
+</body></html>

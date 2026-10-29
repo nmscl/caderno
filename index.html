@@ -6405,6 +6405,45 @@ SETTINGS_NAV_GROUPS.splice(0,SETTINGS_NAV_GROUPS.length,
 );
 
 
+/* ELO_STORAGE_CACHE */
+/* A cópia local dos dados (vários MB) passa do localStorage, limitado a ~5 MB por origem
+   e partilhado com os outros sites do mesmo domínio, para o IndexedDB. O resto da aplicação
+   continua a usar localStorage.getItem/setItem(STORAGE) sem alterações. */
+const eloStorageCache=(()=>{
+  const DB='elo-docente-cache',STORE='kv',KEYS=new Set([STORAGE]),memory=new Map(),proto=Storage.prototype;
+  const nativeGet=proto.getItem,nativeSet=proto.setItem,nativeRemove=proto.removeItem;
+  let local=null,active=false,database=null,writing=Promise.resolve();
+  try{local=window.localStorage;}catch{}
+  const channel=typeof BroadcastChannel==='function'?new BroadcastChannel(DB):null;
+  const managed=(area,key)=>active&&area===local&&KEYS.has(String(key));
+  function open(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB,1);request.onupgradeneeded=()=>request.result.createObjectStore(STORE);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(Error('IndexedDB bloqueado.'));});}
+  function run(mode,operation){return new Promise((resolve,reject)=>{const tx=database.transaction(STORE,mode),request=operation(tx.objectStore(STORE));tx.oncomplete=()=>resolve(request?.result);tx.onerror=tx.onabort=()=>reject(tx.error||Error('Falha no IndexedDB.'));});}
+  function save(key,value){writing=writing.then(()=>run('readwrite',store=>value===null?store.delete(key):store.put(value,key))).catch(error=>console.error('Elo Docente: cópia local não guardada.',error));return writing;}
+  function announce(key,oldValue,newValue){try{channel?.postMessage({key,oldValue,newValue});}catch{}}
+  proto.getItem=function(key){return managed(this,key)?(memory.has(String(key))?memory.get(String(key)):null):nativeGet.call(this,key);};
+  proto.setItem=function(key,value){if(!managed(this,key))return nativeSet.call(this,key,value);key=String(key);value=String(value);const old=memory.has(key)?memory.get(key):null;memory.set(key,value);save(key,value);announce(key,old,value);};
+  proto.removeItem=function(key){if(!managed(this,key))return nativeRemove.call(this,key);key=String(key);const old=memory.has(key)?memory.get(key):null;memory.delete(key);save(key,null);announce(key,old,null);};
+  channel&&(channel.onmessage=event=>{const {key,oldValue,newValue}=event.data||{};if(!KEYS.has(key))return;if(newValue===null)memory.delete(key);else memory.set(key,newValue);try{window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue,storageArea:local}));}catch{}});
+  const ready=(async()=>{
+    if(!local||typeof indexedDB==='undefined')return;
+    try{
+      database=await open();
+      for(const key of KEYS){
+        let value=await run('readonly',store=>store.get(key));
+        const legacy=nativeGet.call(local,key);
+        if(value===undefined&&legacy!==null){await run('readwrite',store=>store.put(legacy,key));value=legacy;}
+        if(value!==undefined&&value!==null)memory.set(key,value);
+        if(legacy!==null)nativeRemove.call(local,key);
+      }
+      active=true;
+    }catch(error){console.warn('Elo Docente: IndexedDB indisponível; a usar o armazenamento local do navegador.',error);}
+  })();
+  return {ready,flush:()=>writing,get active(){return active;}};
+})();
+const storageCacheStartBase=start;
+start=async function(){await eloStorageCache.ready;return storageCacheStartBase();};
+
+
 
 start();
 </script>

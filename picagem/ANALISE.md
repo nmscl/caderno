@@ -130,7 +130,35 @@ ATCUD, IVA, total e retenção.
   conferir em série sem voltar à tabela.
 - Documentos em tabela (total, retenção, a liquidar, movimento, estado).
 
-## 5. Limitações que ficam
+## 5. Várias empresas e histórico
+
+- **Carteira de empresas**: cada empresa tem os seus próprios movimentos,
+  documentos, registos da contabilidade e histórico, sem nada partilhado entre
+  empresas. O NIF não se pode repetir na carteira.
+- **Histórico de conferências**: uma conferência por período e conta bancária,
+  com movimentos, verificados, saldo final, diferença, estado e quem encerrou e reviu.
+  As conferências encerradas ficam em modo de leitura.
+- **Nova conferência com transporte**: saldo inicial igual ao saldo final do extrato
+  anterior, cheques e depósitos ainda pendentes, e documentos por associar.
+- **Exportar e importar empresa** (JSON) e **guardar só a empresa ativa** (HTML),
+  para entregar a um colega ou cliente sem expor as restantes.
+- Os dados ficam no navegador em IndexedDB (com recurso a localStorage), o que permite
+  guardar muitas imagens; a cópia HTML continua a transportar tudo.
+
+## 6. Conferir Móvel (`digitalizar.html`)
+
+Aplicação para o telemóvel, num único ficheiro, que funciona sem servidor:
+
+- Empresas guardadas no telemóvel, cada uma com o seu NIF e o seu lote;
+- Fotografar (câmara traseira) ou escolher da galeria, em série;
+- Leitura automática do **código QR da AT** (NIF, tipo, data, número, ATCUD,
+  IVA, total, retenção). Avisa quando o NIF adquirente não é o da empresa;
+- «Melhorar legibilidade»: tons de cinzento e contraste reforçado, como num digitalizador; rodar a imagem;
+- Lote enviado pela partilha do telemóvel (e-mail, WhatsApp, Drive…) ou descarregado;
+- No Conferir, «Documentos › Importar lote do telemóvel». O lote só entra na
+  empresa com o mesmo NIF (ou oferece abrir a empresa certa), e os duplicados são ignorados.
+
+## 7. Limitações que ficam
 
 - Um documento só pode pertencer a um movimento. Um segundo pagamento parcial
   justifica-se como «liquidação de conta corrente», sem associar outra vez o documento.

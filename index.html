@@ -2019,7 +2019,7 @@ html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .teaching-c
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .teaching-class-list>.teaching-class-card:hover{transform:translateY(-2px);border-color:var(--m-text)}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .teaching-class-metrics strong{color:var(--m-text);font-family:var(--m-display);font-weight:700;letter-spacing:-.03em}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .teaching-class-metrics .has-open-tasks strong{color:var(--m-coral-deep)}
-html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.teaching-class-card,.club-overview-row,.club-overview-card) :is(h2,h3){color:var(--m-text);font-family:var(--m-display);font-weight:750}
+html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.teaching-class-card,.club-overview-row,.club-overview-card) :is(h2,h3){color:var(--m-text);font-family:var(--m-display);font-weight:750;font-size:clamp(20px,1.9vw,28px);line-height:1.08;letter-spacing:-.035em;overflow-wrap:normal;word-break:normal;hyphens:manual}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.club-overview-identity h3,.club-card h3){color:var(--m-text)}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .teaching-class-identity :is(.class-code,strong){color:var(--m-text);font-family:var(--m-display);font-weight:750;letter-spacing:-.04em}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-library-year>header{background:transparent;border:0;border-left:0;border-bottom:2px solid var(--m-text);border-radius:0;padding:4px 2px 12px}
@@ -2028,6 +2028,9 @@ html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-library
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-library-type>h3::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--m-area);transform:rotate(45deg)}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.library-hero,.competency-intro){background:var(--m-area-soft);border-color:transparent}
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .transposed-grade-matrix .matrix-area-section th{border-left-color:var(--m-area)}
+
+html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .club-overview-row .teaching-class-identity .class-code{font-size:clamp(19px,1.7vw,24px);line-height:1.1;overflow-wrap:normal;word-break:normal;hyphens:auto}
+@media (min-width:901px){html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.teaching-class-list,.club-overview-list)>.club-overview-row{grid-template-columns:minmax(190px,1.1fr) minmax(250px,1.6fr) minmax(190px,1fr) auto}}
 
 /* ---------- Definições ---------- */
 html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-settings-layout{grid-template-columns:250px minmax(0,1fr);gap:28px}
@@ -2182,7 +2185,7 @@ html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-auth .a
   html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.card-head,.rv-panel-head){padding:18px}
   html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.body,.rv-panel-body){padding:18px}
   html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-settings-layout{grid-template-columns:1fr;gap:18px}
-  html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.teaching-class-card,.club-overview-row,.club-overview-card) :is(h2,h3){font-size:26px;line-height:1.05;overflow-wrap:anywhere}
+  html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp :is(.teaching-class-card,.club-overview-row,.club-overview-card) :is(h2,h3){font-size:26px;line-height:1.05;overflow-wrap:break-word}
   html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-settings-nav{position:static;max-height:none}
   html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .rv-auth .auth-story{margin:10px 10px 0;border-radius:26px}
   html.mosaico:is([data-elo-theme],:not([data-elo-theme])) body.revamp .m-auth-mosaic{grid-template-columns:repeat(6,1fr);gap:6px;margin-top:22px}

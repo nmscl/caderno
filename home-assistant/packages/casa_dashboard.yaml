@@ -39,6 +39,12 @@ group:
       - cover.shelly_estore_sala     # <-- Shelly 2PM / 2.5
       - cover.shelly_estore_quarto   # <--
 
+  casa_portoes:
+    name: Portões
+    entities:
+      - cover.portao_garagem
+      - cover.portao_rua
+
   # Sensores de potência (W) dos Shelly. Se tiver um Shelly EM / Pro 3EM
   # a medir o quadro geral, deixe apenas esse sensor aqui.
   casa_sensores_potencia:
@@ -117,6 +123,48 @@ template:
         state: >
           {{ (states('sensor.ruijie_ap_tx_taxa') | float(0) * 8 / 1000000) | round(1) }}
         availability: "{{ has_value('sensor.ruijie_ap_tx_taxa') }}"
+
+  # -------------------------------------------------------------------
+  #  Portões. O relé (Shelly 1 / Sonoff) deve estar em modo impulso:
+  #  "Auto off" de 1 s na app Shelly ou "Inching" na app eWeLink.
+  #  O estado vem de um sensor magnético (reed) ligado à entrada SW do
+  #  Shelly ou de um sensor de porta Sonoff (DW2). Sem sensor, apague a
+  #  linha "state:" e o portão funciona em modo otimista.
+  # -------------------------------------------------------------------
+  - cover:
+      - name: Portão garagem
+        unique_id: portao_garagem
+        device_class: garage
+        # sensor magnético  <--
+        state: >
+          {{ 'open' if is_state('binary_sensor.portao_garagem_contacto', 'on') else 'closed' }}
+        open_cover:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.shelly_portao_garagem   # <-- relé
+        close_cover:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.shelly_portao_garagem
+        stop_cover:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.shelly_portao_garagem
+
+      - name: Portão rua
+        unique_id: portao_rua
+        device_class: gate
+        # sensor magnético  <--
+        state: >
+          {{ 'open' if is_state('binary_sensor.portao_rua_contacto', 'on') else 'closed' }}
+        open_cover:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.sonoff_portao_rua       # <-- relé
+        close_cover:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.sonoff_portao_rua
 
 sensor:
   # Energia acumulada a partir da potência total (Riemann)

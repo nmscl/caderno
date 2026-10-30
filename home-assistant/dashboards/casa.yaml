@@ -300,6 +300,118 @@ button_card_templates:
           - align-self: end
 
   # ------------------------------------------------------------------
+  #  Portão de garagem / portão da rua
+  #  variáveis: tipo (garagem | rua). O tap_action fica em cada cartão.
+  # ------------------------------------------------------------------
+  portao:
+    template: vidro
+    variables:
+      tipo: garagem
+    show_state: false
+    show_label: true
+    hold_action:
+      action: more-info
+    icon: |
+      [[[
+        const aberto = entity && entity.state !== 'closed';
+        if (variables.tipo === 'rua') return aberto ? 'mdi:gate-open' : 'mdi:gate';
+        return aberto ? 'mdi:garage-open-variant' : 'mdi:garage-variant';
+      ]]]
+    label: |
+      [[[
+        if (!entity) return 'Entidade não encontrada';
+        const m = { open: 'Aberto', closed: 'Fechado', opening: 'A abrir…', closing: 'A fechar…',
+                    unavailable: 'Indisponível', unknown: 'Estado desconhecido' };
+        let t = m[entity.state] || entity.state;
+        if (entity.state === 'open') {
+          const min = Math.floor((Date.now() - new Date(entity.last_changed)) / 60000);
+          t += min < 1 ? ' agora' : ` há ${min < 60 ? min + ' min' : Math.floor(min / 60) + ' h'}`;
+        }
+        return t;
+      ]]]
+    custom_fields:
+      botao: |
+        [[[
+          if (!entity || entity.state === 'unavailable') return '';
+          const fechar = entity.state === 'open' || entity.state === 'opening';
+          return `<ha-icon icon="mdi:${fechar ? 'arrow-down' : 'arrow-up'}" style="--mdc-icon-size:16px"></ha-icon>${fechar ? 'Fechar' : 'Abrir'}`;
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: '"i botao" "n n" "l l"'
+        - grid-template-columns: 1fr auto
+        - grid-template-rows: 1fr min-content min-content
+      card:
+        - padding: 16px
+        - height: 128px
+        - border: 1px solid rgba(105, 240, 174, 0.30)
+      img_cell:
+        - justify-self: start
+        - align-self: start
+        - width: 46px
+        - height: 46px
+        - border-radius: 15px
+        - background: rgba(105, 240, 174, 0.15)
+      icon:
+        - width: 26px
+        - color: rgb(105, 240, 174)
+      name:
+        - justify-self: start
+        - font-size: 15px
+        - font-weight: 600
+        - margin-top: 10px
+      label:
+        - justify-self: start
+        - font-size: 12px
+        - color: rgba(242, 243, 255, 0.6)
+      custom_fields:
+        botao:
+          - align-self: start
+          - display: flex
+          - align-items: center
+          - gap: 4px
+          - font-size: 13px
+          - font-weight: 700
+          - padding: 7px 12px
+          - border-radius: 999px
+          - background: rgba(255, 255, 255, 0.10)
+    state:
+      - value: open
+        styles:
+          card:
+            - background: linear-gradient(135deg, rgba(255,145,0,0.40), rgba(255,145,0,0.06))
+            - border: 1px solid rgba(255, 145, 0, 0.6)
+            - box-shadow: 0 0 30px rgba(255, 145, 0, 0.35)
+          img_cell:
+            - background: rgb(255, 145, 0)
+            - box-shadow: 0 0 18px rgba(255, 145, 0, 0.9)
+            - animation: alerta 1.8s ease-in-out infinite
+          icon:
+            - color: "#10111f"
+          label:
+            - color: rgb(255, 171, 64)
+            - font-weight: 600
+          custom_fields:
+            botao:
+              - background: rgb(255, 145, 0)
+              - color: "#10111f"
+      - operator: regex
+        value: "^(opening|closing)$"
+        styles:
+          img_cell:
+            - background: rgb(255, 214, 0)
+            - animation: piscar 0.8s ease-in-out infinite
+          icon:
+            - color: "#10111f"
+      - value: unavailable
+        styles:
+          card:
+            - opacity: 0.4
+    extra_styles: |
+      @keyframes alerta { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,145,0,.8); } 50% { box-shadow: 0 0 0 10px rgba(255,145,0,0); } }
+      @keyframes piscar { 50% { opacity: .35; } }
+
+  # ------------------------------------------------------------------
   #  Cabeçalho com saudação, hora e resumo da casa
   # ------------------------------------------------------------------
   cabecalho:
@@ -312,6 +424,9 @@ button_card_templates:
       ligados: sensor.casa_dispositivos_ligados
       ap: binary_sensor.ruijie_ap               # <-- sensor de ping do AP
       clientes: sensor.ruijie_ap_clientes
+      portoes:                                  # <-- portões a vigiar
+        - cover.portao_garagem
+        - cover.portao_rua
       meteo: weather.forecast_casa              # <-- opcional
     show_icon: false
     show_name: false
@@ -348,11 +463,16 @@ button_card_templates:
           const t = ac && ac.attributes.current_temperature != null ? Number(ac.attributes.current_temperature).toFixed(1) + '°' : '—';
           const ap = states[variables.ap];
           const on = ap && ap.state === 'on';
+          const abertos = (variables.portoes || []).filter((id) => states[id] && states[id].state !== 'closed' && states[id].state !== 'unavailable');
+          const portao = abertos.length
+            ? `<div class="chip alerta"><ha-icon icon="mdi:garage-alert-variant"></ha-icon>${abertos.length === 1 ? (states[abertos[0]].attributes.friendly_name || 'Portão') + ' aberto' : abertos.length + ' portões abertos'}</div>`
+            : `<div class="chip"><ha-icon icon="mdi:garage-lock"></ha-icon>Portões fechados</div>`;
           return `
             <div class="chip"><ha-icon icon="mdi:home-thermometer"></ha-icon>${t}</div>
             <div class="chip"><ha-icon icon="mdi:flash"></ha-icon>${num(variables.consumo)} W</div>
             <div class="chip"><ha-icon icon="mdi:lightbulb-group"></ha-icon>${num(variables.ligados)} ligados</div>
-            <div class="chip"><span class="ponto ${on ? 'on' : 'off'}"></span>Wi-Fi ${on ? num(variables.clientes) + ' disp.' : 'offline'}</div>`;
+            <div class="chip"><span class="ponto ${on ? 'on' : 'off'}"></span>Wi-Fi ${on ? num(variables.clientes) + ' disp.' : 'offline'}</div>
+            ${portao}`;
         ]]]
     styles:
       grid:
@@ -403,6 +523,7 @@ button_card_templates:
               background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.14);
               font-size: 14px; font-weight: 600; }
       .chip ha-icon { --mdc-icon-size: 18px; }
+      .chip.alerta { background: rgba(255,145,0,.9); color: #10111f; border-color: transparent; }
       .ponto { width: 9px; height: 9px; border-radius: 50%; }
       .ponto.on { background: #69f0ae; animation: pulsar 2s infinite; }
       .ponto.off { background: #ff5252; }
@@ -564,6 +685,42 @@ views:
               confirmation:
                 text: Desligar tudo, desligar o ar condicionado e fechar os estores?
             grid_options: { columns: 3, rows: auto }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Portões
+            icon: mdi:garage-variant
+          - type: custom:button-card
+            template: portao
+            entity: cover.portao_garagem
+            name: Garagem
+            variables:
+              tipo: garagem
+            tap_action:
+              action: perform-action
+              perform_action: cover.toggle
+              target:
+                entity_id: cover.portao_garagem
+              haptic: heavy
+              confirmation:
+                text: Acionar o portão da garagem?
+            grid_options: { columns: 6, rows: auto }
+          - type: custom:button-card
+            template: portao
+            entity: cover.portao_rua
+            name: Portão rua
+            variables:
+              tipo: rua
+            tap_action:
+              action: perform-action
+              perform_action: cover.toggle
+              target:
+                entity_id: cover.portao_rua
+              haptic: heavy
+              confirmation:
+                text: Acionar o portão da rua?
+            grid_options: { columns: 6, rows: auto }
 
       - type: grid
         cards:

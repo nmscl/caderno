@@ -613,6 +613,410 @@ button_card_templates:
       .item small { font-size: 11px; opacity: .6; }
       .item span { font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: .5px; }
 
+  # ------------------------------------------------------------------
+  #  Orbe: equipamento em órbita no ecrã Montra
+  #  variáveis: cor (RGB). Acende com estado "on" ou "open".
+  # ------------------------------------------------------------------
+  orbe:
+    variables:
+      cor: "255, 183, 77"
+    show_state: false
+    tap_action:
+      action: toggle
+      haptic: medium
+    hold_action:
+      action: more-info
+    styles:
+      card:
+        - background: none
+        - border: none
+        - box-shadow: none
+        - padding: 0
+        - overflow: visible
+      grid:
+        - grid-template-areas: '"i" "n"'
+        - grid-template-rows: min-content min-content
+      img_cell:
+        - width: 58px
+        - height: 58px
+        - border-radius: 50%
+        - background: rgba(255, 255, 255, 0.06)
+        - border: 1px solid rgba(255, 255, 255, 0.14)
+        - backdrop-filter: blur(10px)
+        - -webkit-backdrop-filter: blur(10px)
+        - transition: all 0.5s ease
+        - --c: "[[[ return variables.cor ]]]"
+      icon:
+        - width: 26px
+        - color: rgba(242, 243, 255, 0.55)
+        - transition: color 0.5s ease
+      name:
+        - font-size: 10px
+        - font-weight: 700
+        - letter-spacing: 1px
+        - text-transform: uppercase
+        - margin-top: 8px
+        - color: rgba(242, 243, 255, 0.6)
+    state:
+      - operator: template
+        value: "[[[ return entity && (entity.state === 'on' || entity.state === 'open') ]]]"
+        styles:
+          img_cell:
+            - background: "[[[ return `radial-gradient(circle at 35% 30%, #fff, rgb(${variables.cor}) 45%, rgba(${variables.cor},0.6))` ]]]"
+            - border: "[[[ return `1px solid rgba(${variables.cor},0.9)` ]]]"
+            - animation: halo 2.4s ease-out infinite
+          icon:
+            - color: "#10111f"
+          name:
+            - color: "[[[ return `rgb(${variables.cor})` ]]]"
+            - text-shadow: "[[[ return `0 0 12px rgba(${variables.cor},0.8)` ]]]"
+      - value: unavailable
+        styles:
+          card:
+            - opacity: 0.35
+    extra_styles: |
+      @keyframes halo {
+        0%   { box-shadow: 0 0 0 0 rgba(var(--c), .55), 0 0 28px rgba(var(--c), .85); }
+        100% { box-shadow: 0 0 0 22px rgba(var(--c), 0), 0 0 28px rgba(var(--c), .85); }
+      }
+
+  # ------------------------------------------------------------------
+  #  Montra: ecrã de entrada para tablet de parede
+  # ------------------------------------------------------------------
+  montra:
+    triggers_update: all
+    variables:
+      consumo: sensor.casa_consumo_total
+      energia_hoje: sensor.casa_energia_hoje
+      custo_hoje: sensor.casa_custo_hoje
+      potencia_max: 6900                        # <-- potência contratada (W)
+      ac:
+        - climate.ac_sala
+        - climate.ac_quarto
+      portoes:
+        - cover.portao_garagem
+        - cover.portao_rua
+      ap: binary_sensor.ruijie_ap
+      clientes: sensor.ruijie_ap_clientes
+      meteo: weather.forecast_casa              # <-- opcional
+      boas_vindas: input_boolean.casa_boas_vindas
+      boas_vindas_nome: input_text.casa_boas_vindas_nome
+    show_icon: false
+    show_name: false
+    show_state: false
+    tap_action:
+      action: none
+    custom_fields:
+      fundo: |
+        [[[ return '<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>'; ]]]
+      anel: |
+        [[[
+          const s = states[variables.consumo];
+          const w = s ? parseFloat(s.state) || 0 : 0;
+          const f = Math.min(w / variables.potencia_max, 1);
+          const r = 150, C = 2 * Math.PI * r;
+          let ticks = '';
+          for (let i = 0; i < 60; i++) {
+            const a = i * Math.PI / 30, l = i % 5 ? 6 : 14, r1 = 186, r2 = r1 - l;
+            ticks += `<line x1="${200 + r1 * Math.sin(a)}" y1="${200 - r1 * Math.cos(a)}" x2="${200 + r2 * Math.sin(a)}" y2="${200 - r2 * Math.cos(a)}"
+                       stroke="rgba(255,255,255,${i % 5 ? .14 : .4})" stroke-width="${i % 5 ? 1.5 : 2.5}" stroke-linecap="round"/>`;
+          }
+          return `<svg viewBox="0 0 400 400">
+            <defs>
+              <linearGradient id="gEn" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#00e5ff"/><stop offset=".55" stop-color="#7c4dff"/><stop offset="1" stop-color="#ff4081"/>
+              </linearGradient>
+              <filter id="brilho" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+            ${ticks}
+            <circle cx="200" cy="200" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="14"/>
+            <circle cx="200" cy="200" r="${r}" fill="none" stroke="url(#gEn)" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="${(C * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 200 200)" filter="url(#brilho)"/>
+            <circle class="gira" cx="200" cy="200" r="124" fill="none" stroke="rgba(124,77,255,.45)" stroke-width="1.2" stroke-dasharray="2 9"/>
+            <g class="ponteiro" style="animation-delay:-${new Date().getSeconds()}s">
+              <circle cx="200" cy="14" r="5" fill="#00e5ff" filter="url(#brilho)"/>
+            </g>
+          </svg>`;
+        ]]]
+      centro: |
+        [[[
+          const d = new Date(), h = d.getHours();
+          const s = h < 6 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite';
+          const w = states[variables.consumo] ? Math.round(parseFloat(states[variables.consumo].state) || 0) : '—';
+          return `<div class="saud">${s}</div>
+                  <div class="hora">${d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div class="data">${d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                  <div class="watts"><ha-icon icon="mdi:flash"></ha-icon>${w} W</div>`;
+        ]]]
+      meteo: |
+        [[[
+          const w = states[variables.meteo];
+          if (!w) return '';
+          const i = { 'sunny': ['weather-sunny', 'Sol'], 'clear-night': ['weather-night', 'Céu limpo'], 'cloudy': ['weather-cloudy', 'Nublado'],
+                      'partlycloudy': ['weather-partly-cloudy', 'Pouco nublado'], 'rainy': ['weather-rainy', 'Chuva'], 'pouring': ['weather-pouring', 'Chuva forte'],
+                      'fog': ['weather-fog', 'Nevoeiro'], 'windy': ['weather-windy', 'Vento'], 'snowy': ['weather-snowy', 'Neve'],
+                      'lightning': ['weather-lightning', 'Trovoada'], 'lightning-rainy': ['weather-lightning-rainy', 'Trovoada'] }[w.state] || ['weather-cloudy', w.state];
+          return `<ha-icon icon="mdi:${i[0]}"></ha-icon><div><b>${Math.round(w.attributes.temperature)}°</b><span>${i[1]} · exterior</span></div>`;
+        ]]]
+      estado: |
+        [[[
+          const abertos = variables.portoes.filter((id) => states[id] && !['closed', 'unavailable'].includes(states[id].state));
+          const ap = states[variables.ap], on = ap && ap.state === 'on';
+          const cli = states[variables.clientes] ? states[variables.clientes].state : '—';
+          return (abertos.length
+              ? `<div class="pill alerta"><ha-icon icon="mdi:garage-alert-variant"></ha-icon>${abertos.length === 1 ? (states[abertos[0]].attributes.friendly_name || 'Portão') + ' aberto' : abertos.length + ' portões abertos'}</div>`
+              : `<div class="pill"><ha-icon icon="mdi:shield-home"></ha-icon>Casa segura</div>`)
+            + `<div class="pill"><span class="ponto ${on ? 'on' : 'off'}"></span>Wi-Fi · ${on ? cli + ' dispositivos' : 'offline'}</div>`;
+        ]]]
+      clima: |
+        [[[
+          const cor = { cool: '0,200,255', heat: '255,120,64', heat_cool: '105,240,174', auto: '105,240,174', dry: '130,170,255', fan_only: '180,140,255' };
+          const txt = { off: 'Desligado', cool: 'A arrefecer', heat: 'A aquecer', heat_cool: 'Automático', auto: 'Automático', dry: 'A desumidificar', fan_only: 'Ventilação' };
+          return variables.ac.map((id) => {
+            const a = states[id]; if (!a) return '';
+            const c = cor[a.state] || '150,152,175', t = a.attributes.current_temperature;
+            const nome = (a.attributes.friendly_name || id).replace(/^(AC|Ar condicionado)\s*/i, '');
+            return `<div class="linha"><span class="ponto" style="background:rgb(${c});box-shadow:0 0 10px rgb(${c})"></span>
+                    <span class="nome">${nome}</span><b>${t != null ? Number(t).toFixed(1) + '°' : '—'}</b><span class="sub">${txt[a.state] || a.state}</span></div>`;
+          }).join('');
+        ]]]
+      energia: |
+        [[[
+          const v = (id, d) => { const s = states[id]; const n = s ? parseFloat(s.state) : NaN; return isNaN(n) ? '—' : n.toLocaleString('pt-PT', { minimumFractionDigits: d, maximumFractionDigits: d }); };
+          return `<div class="linha"><span class="nome">Hoje</span><b>${v(variables.energia_hoje, 2)}</b><span class="sub">kWh</span></div>
+                  <div class="linha"><span class="nome">Custo</span><b>${v(variables.custo_hoje, 2)}</b><span class="sub">€</span></div>`;
+        ]]]
+      boasvindas: |
+        [[[
+          const b = states[variables.boas_vindas];
+          if (!b || b.state !== 'on') return '';
+          const n = states[variables.boas_vindas_nome];
+          const nome = n && n.state && !['unknown', ''].includes(n.state) ? n.state.split(' ')[0] : '';
+          const ac = states[variables.ac[0]];
+          const t = ac && ac.attributes.current_temperature != null ? Number(ac.attributes.current_temperature).toFixed(1) + '° na sala' : '';
+          return `<div class="bv">
+                    <div class="onda o1"></div><div class="onda o2"></div><div class="onda o3"></div>
+                    <div class="bv-sub">Bem-vindo a casa</div>
+                    <div class="bv-nome">${nome || 'Olá!'}</div>
+                    <div class="bv-info">${[t, 'luzes acesas', 'estores a abrir'].filter(Boolean).join(' · ')}</div>
+                  </div>`;
+        ]]]
+    styles:
+      card:
+        - position: relative
+        - height: calc(100vh - var(--header-height, 56px))
+        - min-height: 560px
+        - overflow: hidden
+        - border: none
+        - border-radius: 0
+        - color: "#f2f3ff"
+        - background: >-
+            radial-gradient(1.5px 1.5px at 12% 18%, rgba(255,255,255,.7), transparent),
+            radial-gradient(1px 1px at 72% 12%, rgba(255,255,255,.6), transparent),
+            radial-gradient(1.5px 1.5px at 86% 64%, rgba(255,255,255,.5), transparent),
+            radial-gradient(1px 1px at 28% 78%, rgba(255,255,255,.6), transparent),
+            radial-gradient(1px 1px at 52% 92%, rgba(255,255,255,.4), transparent),
+            radial-gradient(1px 1px at 6% 52%, rgba(255,255,255,.5), transparent),
+            #05060d
+      grid:
+        - grid-template-areas: '"n"'
+      custom_fields:
+        fundo:
+          - position: absolute
+          - inset: 0
+          - pointer-events: none
+        anel:
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: min(56vmin, 520px)
+          - height: min(56vmin, 520px)
+          - transform: translate(-50%, -50%)
+          - pointer-events: none
+        centro:
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - transform: translate(-50%, -50%)
+          - text-align: center
+          - pointer-events: none
+        meteo:
+          - position: absolute
+          - left: 28px
+          - top: 24px
+          - display: flex
+          - align-items: center
+          - gap: 12px
+        estado:
+          - position: absolute
+          - right: 24px
+          - top: 24px
+          - display: flex
+          - flex-direction: column
+          - align-items: flex-end
+          - gap: 8px
+        clima:
+          - position: absolute
+          - left: 24px
+          - bottom: 24px
+        energia:
+          - position: absolute
+          - right: 24px
+          - bottom: 24px
+        # o1…o8: posições na órbita, de 45 em 45 graus a partir do topo
+        o1:
+          - --a: -90deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o2:
+          - --a: -45deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o3:
+          - --a: 0deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o4:
+          - --a: 45deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o5:
+          - --a: 90deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o6:
+          - --a: 135deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o7:
+          - --a: 180deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        o8:
+          - --a: 225deg
+          - position: absolute
+          - left: 50%
+          - top: 50%
+          - width: 84px
+          - margin: -46px 0 0 -42px
+          - z-index: 2
+          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
+        espetaculo:
+          - position: absolute
+          - right: 24px
+          - bottom: 124px
+          - z-index: 3
+        boasvindas:
+          - position: absolute
+          - inset: 0
+          - z-index: 4
+          - pointer-events: none
+    extra_styles: |
+      @keyframes deriva1 { to { transform: translate(18vw, 12vh) scale(1.2); } }
+      @keyframes deriva2 { to { transform: translate(-16vw, -10vh) scale(.85); } }
+      @keyframes deriva3 { to { transform: translate(10vw, -14vh) scale(1.15); } }
+      @keyframes rodar { to { transform: rotate(360deg); } }
+      @keyframes pulsar { 0% { box-shadow: 0 0 0 0 rgba(105,240,174,.7); } 70% { box-shadow: 0 0 0 8px rgba(105,240,174,0); } 100% { box-shadow: 0 0 0 0 rgba(105,240,174,0); } }
+      @keyframes bv-entra { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes bv-nome { from { opacity: 0; transform: scale(.7); filter: blur(18px); letter-spacing: .4em; } to { opacity: 1; transform: none; filter: none; letter-spacing: -.02em; } }
+      @keyframes bv-sobe { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+      @keyframes onda { from { transform: scale(.2); opacity: .9; } to { transform: scale(3.2); opacity: 0; } }
+      .blob { position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%; filter: blur(90px); opacity: .45; }
+      .b1 { background: #7c4dff; left: -20vmax; top: -25vmax; animation: deriva1 26s ease-in-out infinite alternate; }
+      .b2 { background: #00b8d4; right: -22vmax; top: 5vmax; animation: deriva2 32s ease-in-out infinite alternate; }
+      .b3 { background: #ff4081; left: 15vmax; bottom: -35vmax; opacity: .3; animation: deriva3 38s ease-in-out infinite alternate; }
+      #anel svg { width: 100%; height: 100%; overflow: visible; }
+      .gira { transform-origin: 200px 200px; animation: rodar 90s linear infinite; }
+      .ponteiro { transform-origin: 200px 200px; animation: rodar 60s linear infinite; }
+      .saud { font-size: min(2.6vmin, 20px); letter-spacing: .3em; text-transform: uppercase; opacity: .7; }
+      .hora { font-size: min(14vmin, 128px); font-weight: 200; letter-spacing: -.04em; line-height: 1;
+              background: linear-gradient(180deg, #fff 30%, #b9a6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .data { font-size: min(2.6vmin, 18px); opacity: .7; margin-top: 4px; }
+      .data::first-letter { text-transform: uppercase; }
+      .watts { display: inline-flex; align-items: center; gap: 4px; margin-top: 14px; padding: 6px 14px; border-radius: 999px;
+               background: rgba(124,77,255,.18); border: 1px solid rgba(124,77,255,.4); font-weight: 600; font-size: min(2.4vmin, 16px); }
+      .watts ha-icon { --mdc-icon-size: 16px; color: #00e5ff; }
+      #meteo ha-icon { --mdc-icon-size: 46px; color: #ffd54f; filter: drop-shadow(0 0 14px rgba(255,213,79,.6)); }
+      #meteo b { display: block; font-size: 34px; font-weight: 300; line-height: 1; }
+      #meteo span { font-size: 13px; opacity: .65; }
+      .pill { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; font-weight: 600; font-size: 13px;
+              background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(12px); }
+      .pill ha-icon { --mdc-icon-size: 18px; color: #69f0ae; }
+      .pill.alerta { background: rgba(255,145,0,.9); color: #10111f; border-color: transparent; }
+      .pill.alerta ha-icon { color: #10111f; }
+      .ponto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+      .ponto.on { background: #69f0ae; animation: pulsar 2s infinite; }
+      .ponto.off { background: #ff5252; }
+      #clima, #energia { display: grid; gap: 6px; padding: 14px 18px; border-radius: 22px; background: rgba(255,255,255,.05);
+                         border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(14px); min-width: 190px; }
+      .linha { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+      .linha .nome { opacity: .65; min-width: 52px; }
+      .linha b { font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; }
+      .linha .sub { opacity: .5; font-size: 12px; }
+      .bv { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+            background: radial-gradient(circle at 50% 50%, rgba(124,77,255,.55), rgba(5,6,13,.92) 65%);
+            animation: bv-entra .8s ease both; overflow: hidden; }
+      .onda { position: absolute; left: 50%; top: 50%; width: 40vmin; height: 40vmin; margin: -20vmin 0 0 -20vmin; border-radius: 50%;
+              border: 2px solid rgba(0,229,255,.7); animation: onda 3s ease-out infinite; }
+      .o2 { animation-delay: 1s; border-color: rgba(255,64,129,.6); }
+      .o3 { animation-delay: 2s; border-color: rgba(124,77,255,.7); }
+      .bv-sub { font-size: min(3.4vmin, 26px); letter-spacing: .4em; text-transform: uppercase; opacity: .85; animation: bv-sobe .8s .3s ease both; }
+      .bv-nome { font-size: min(18vmin, 170px); font-weight: 700; line-height: 1.05;
+                 background: linear-gradient(90deg, #00e5ff, #b388ff, #ff4081); -webkit-background-clip: text; background-clip: text; color: transparent;
+                 animation: bv-nome 1.4s .5s cubic-bezier(.2,.8,.2,1) both; }
+      .bv-info { font-size: min(2.8vmin, 20px); opacity: .8; margin-top: 12px; animation: bv-sobe .8s 1.6s ease both; }
+      @media (max-width: 700px) {
+        #clima, #energia { min-width: 0; padding: 10px 12px; }
+        .linha b { font-size: 17px; }
+        #meteo b { font-size: 26px; }
+        #meteo ha-icon { --mdc-icon-size: 34px; }
+        #espetaculo { right: auto !important; bottom: auto !important; left: 50%; transform: translateX(-50%);
+                      top: calc(50% + min(28vmin, 260px) + 92px); }
+      }
+      @media (max-width: 500px) {
+        #o1, #o2, #o3, #o4, #o5, #o6, #o7, #o8 {
+          width: 76px !important; margin-left: -38px !important;
+          transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 40px)) rotate(calc(-1 * var(--a))) !important;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 
 # =====================================================================
 #  VISTAS
@@ -620,6 +1024,133 @@ button_card_templates:
 views:
 
   # -------------------------------------------------------------------
+  #  Ecrã de entrada (tablet de parede). Abra em /<painel>/montra
+  # -------------------------------------------------------------------
+  - title: Montra
+    path: montra
+    icon: mdi:creation
+    type: panel
+    cards:
+      - type: custom:button-card
+        template: montra
+        custom_fields:
+          o1:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: light.sala
+              name: Sala
+              icon: mdi:sofa-single
+              variables:
+                cor: "255, 183, 77"
+          o2:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: light.cozinha
+              name: Cozinha
+              icon: mdi:countertop
+              variables:
+                cor: "255, 183, 77"
+          o3:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: light.quarto
+              name: Quarto
+              icon: mdi:bed
+              variables:
+                cor: "255, 183, 77"
+          o4:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: switch.sonoff_jardim
+              name: Jardim
+              icon: mdi:pine-tree
+              variables:
+                cor: "105, 240, 174"
+          o5:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: switch.shelly_maquina_lavar
+              name: Máquina
+              icon: mdi:washing-machine
+              variables:
+                cor: "0, 229, 255"
+          o6:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: switch.shelly_termoacumulador
+              name: Termo
+              icon: mdi:water-boiler
+              variables:
+                cor: "0, 229, 255"
+          o7:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: cover.portao_garagem
+              name: Garagem
+              icon: mdi:garage-variant
+              variables:
+                cor: "255, 145, 0"
+              tap_action:
+                action: perform-action
+                perform_action: cover.toggle
+                target:
+                  entity_id: cover.portao_garagem
+                confirmation:
+                  text: Acionar o portão da garagem?
+          o8:
+            card:
+              type: custom:button-card
+              template: orbe
+              entity: cover.portao_rua
+              name: Portão
+              icon: mdi:gate
+              variables:
+                cor: "255, 145, 0"
+              tap_action:
+                action: perform-action
+                perform_action: cover.toggle
+                target:
+                  entity_id: cover.portao_rua
+                confirmation:
+                  text: Acionar o portão da rua?
+          espetaculo:
+            card:
+              type: custom:button-card
+              name: Espetáculo
+              icon: mdi:creation
+              tap_action:
+                action: perform-action
+                perform_action: script.casa_boas_vindas
+                data:
+                  luzes: true
+                haptic: success
+              styles:
+                card:
+                  - padding: 10px 20px 10px 14px
+                  - border-radius: 999px
+                  - background: linear-gradient(90deg, rgba(0,229,255,.25), rgba(124,77,255,.35), rgba(255,64,129,.25))
+                  - border: 1px solid rgba(255,255,255,.25)
+                  - box-shadow: 0 0 30px rgba(124,77,255,.45)
+                  - backdrop-filter: blur(12px)
+                grid:
+                  - grid-template-areas: '"i n"'
+                  - column-gap: 8px
+                icon:
+                  - width: 20px
+                  - color: "#fff"
+                name:
+                  - font-size: 14px
+                  - font-weight: 700
+                  - letter-spacing: 1px
+                  - color: "#fff"
+
   - title: Início
     path: inicio
     icon: mdi:home-variant

@@ -56,6 +56,19 @@ group:
 # ---------------------------------------------------------------------
 #  Preço da eletricidade (ajustável no próprio dashboard)
 # ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
+#  Boas-vindas (ecrã "Montra")
+# ---------------------------------------------------------------------
+input_boolean:
+  casa_boas_vindas:
+    name: Boas-vindas a mostrar
+    icon: mdi:party-popper
+
+input_text:
+  casa_boas_vindas_nome:
+    name: Quem chegou
+    max: 60
+
 input_number:
   casa_preco_kwh:
     name: Preço do kWh
@@ -294,3 +307,73 @@ script:
           entity_id: climate.ac_sala
         data:
           temperature: 22
+
+  # Espetáculo de boas-vindas: luzes em cascata, estores a abrir e a
+  # mensagem "Bem-vindo a casa" no ecrã Montra durante 20 segundos.
+  casa_boas_vindas:
+    alias: Boas-vindas
+    icon: mdi:creation
+    mode: restart
+    fields:
+      luzes:
+        description: Acender as luzes em sequência
+        default: true
+        selector:
+          boolean:
+    sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.casa_boas_vindas_nome
+        data:
+          value: >
+            {{ states.person | selectattr('state', 'eq', 'home')
+               | sort(attribute='last_changed', reverse=true)
+               | map(attribute='name') | first | default('') }}
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.casa_boas_vindas
+      - if:
+          - condition: template
+            value_template: "{{ luzes | default(true) | bool }}"
+        then:
+          - action: homeassistant.turn_on
+            target:
+              entity_id: switch.sonoff_jardim     # <-- exterior primeiro
+          - delay: { milliseconds: 700 }
+          - action: light.turn_on
+            target:
+              entity_id: light.sala               # <--
+            data:
+              brightness_pct: 100
+          - delay: { milliseconds: 700 }
+          - action: light.turn_on
+            target:
+              entity_id: light.cozinha            # <--
+      - action: cover.open_cover
+        target:
+          entity_id: group.casa_estores
+      - delay: "00:00:20"
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.casa_boas_vindas
+
+# ---------------------------------------------------------------------
+#  Quando alguém chega a casa, o ecrã Montra dá as boas-vindas.
+#  De dia só mostra a mensagem; à noite acende também as luzes.
+# ---------------------------------------------------------------------
+automation:
+  - id: casa_boas_vindas_chegada
+    alias: Boas-vindas ao chegar a casa
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: zone.home
+    conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.from_state is not none and
+             trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}
+    actions:
+      - action: script.casa_boas_vindas
+        data:
+          luzes: "{{ is_state('sun.sun', 'below_horizon') }}"

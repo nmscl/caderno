@@ -308,13 +308,18 @@ script:
         data:
           temperature: 22
 
-  # Espetáculo de boas-vindas: luzes em cascata, estores a abrir e a
-  # mensagem "Bem-vindo a casa" no ecrã Montra durante 20 segundos.
+  # Boas-vindas: mostra "Bom dia, <nome>" no ecrã Montra durante 20 s
+  # e, se pedido, acende as luzes em cascata e abre os estores.
   casa_boas_vindas:
     alias: Boas-vindas
-    icon: mdi:creation
+    icon: mdi:hand-wave
     mode: restart
     fields:
+      nome:
+        description: Nome a mostrar (vazio = última pessoa a chegar)
+        example: Nuno
+        selector:
+          text:
       luzes:
         description: Acender as luzes em sequência
         default: true
@@ -326,9 +331,10 @@ script:
           entity_id: input_text.casa_boas_vindas_nome
         data:
           value: >
+            {% if nome | default('') %}{{ nome }}{% else %}
             {{ states.person | selectattr('state', 'eq', 'home')
                | sort(attribute='last_changed', reverse=true)
-               | map(attribute='name') | first | default('') }}
+               | map(attribute='name') | first | default('') }}{% endif %}
       - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.casa_boas_vindas
@@ -349,31 +355,54 @@ script:
           - action: light.turn_on
             target:
               entity_id: light.cozinha            # <--
-      - action: cover.open_cover
-        target:
-          entity_id: group.casa_estores
+          - action: cover.open_cover
+            target:
+              entity_id: group.casa_estores
       - delay: "00:00:20"
       - action: input_boolean.turn_off
         target:
           entity_id: input_boolean.casa_boas_vindas
 
 # ---------------------------------------------------------------------
-#  Quando alguém chega a casa, o ecrã Montra dá as boas-vindas.
-#  De dia só mostra a mensagem; à noite acende também as luzes.
+#  Fechadura Nuki Smart Lock Ultra (MQTT)
+#
+#  Na app Nuki: Fechadura → Funcionalidades e configuração → MQTT.
+#  Ative-o e indique o IP do Home Assistant e o utilizador/palavra-passe
+#  do add-on Mosquitto. A Nuki publica em nuki/<id>/lockActionEvent:
+#      ação, origem, Auth-ID, Code-ID, auto-unlock
+#  O Auth-ID identifica o telemóvel que abriu a porta.
 # ---------------------------------------------------------------------
+mqtt:
+  sensor:
+    # Mostra o último evento da fechadura, p. ex. "1,0,123456789,0,0".
+    # Abra a porta com cada telemóvel e anote o 3.º número (Auth-ID).
+    - name: Nuki último evento
+      unique_id: nuki_ultimo_evento
+      state_topic: "nuki/+/lockActionEvent"
+      icon: mdi:lock-clock
+
 automation:
-  - id: casa_boas_vindas_chegada
-    alias: Boas-vindas ao chegar a casa
+  - id: casa_boas_vindas_fechadura
+    alias: Boas-vindas quando um telemóvel abre a porta
     mode: single
+    max_exceeded: silent
     triggers:
-      - trigger: state
-        entity_id: zone.home
+      - trigger: mqtt
+        topic: "nuki/+/lockActionEvent"
+    variables:
+      # Auth-ID do telemóvel: nome a mostrar no ecrã
+      donos:
+        "111111111": Nome 1     # <-- o seu telemóvel
+        "222222222": Nome 2     # <-- telemóvel da sua mulher
+      partes: "{{ trigger.payload.split(',') }}"
+      acao: "{{ partes[0] | int(0) }}"
+      auth: "{{ (partes[2] if partes | count > 2 else '') | trim }}"
+      nome: "{{ donos.get(auth, '') }}"
     conditions:
-      - condition: template
-        value_template: >
-          {{ trigger.from_state is not none and
-             trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}
+      # 1 = destrancar, 3 = abrir trinco; só os telemóveis da lista
+      - "{{ acao in [1, 3] and nome != '' }}"
     actions:
       - action: script.casa_boas_vindas
         data:
+          nome: "{{ nome }}"
           luzes: "{{ is_state('sun.sun', 'below_horizon') }}"

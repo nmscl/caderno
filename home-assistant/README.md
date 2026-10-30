@@ -14,7 +14,7 @@ Dashboard escuro com efeito de vidro e cores neon para **Sonoff**, **Shelly**,
 
 | Vista | O que tem |
 |---|---|
-| **Montra** | Ecrã de entrada para um tablet na parede: relógio gigante dentro de um anel de energia a brilhar, equipamentos em órbita que acendem quando estão ligados, meteorologia, clima, energia e segurança nos cantos. O botão **✨ Espetáculo** acende as luzes em cascata, abre os estores e mostra "Bem-vindo a casa" |
+| **Montra** | Ecrã de entrada para um tablet na parede: relógio gigante dentro de um anel de energia a brilhar, equipamentos em órbita que acendem quando estão ligados e ligados ao anel por raios de luz, fundo que muda de cor com a hora do dia, meteorologia, fechadura, clima e energia nos cantos. Quando o seu telemóvel ou o da sua mulher abre a porta, aparece "Bom dia" com o nome e a foto de quem chegou |
 | **Início** | Cabeçalho animado com saudação, hora, meteorologia e resumo (temperatura, consumo, equipamentos ligados, Wi-Fi, portões) · 4 cenas rápidas · portões · luzes · tomadas e estores · ar condicionado · rede |
 | **Clima** | Cada AC com termóstato completo (modos e ventilação) e gráfico de 24 h (temperatura atual e alvo) |
 | **Energia** | Consumo agora, energia e custo de hoje · manómetro de potência · gráficos por equipamento |
@@ -124,8 +124,15 @@ consumo, junte o sensor de potência ao grupo `casa_sensores_potencia`.
 
 - Abra o endereço do painel com `/montra` no fim, por exemplo `http://homeassistant.local:8123/painel-casa/montra`.
 - Para ficar em ecrã inteiro e sempre ligado, use a app **Fully Kiosk Browser** (Android) ou o modo quiosque da app Home Assistant. Ponha o tablet sempre a carregar.
-- **Boas-vindas automáticas**: quando chega alguém a casa (`zone.home` aumenta), o ecrã mostra "Bem-vindo a casa" e o primeiro nome da pessoa. À noite acende também as luzes em sequência e abre os estores. Para isto, cada pessoa precisa da app Home Assistant no telemóvel, com a localização ativa.
-- Para mostrar a quem visita, toque em **✨ Espetáculo**.
+- **Boas-vindas pela fechadura Nuki Smart Lock Ultra**: quando a porta é aberta por um dos telemóveis registados, o ecrã mostra
+  "Bom dia" (ou "Boa tarde" / "Boa noite"), o nome e a foto da pessoa. À noite acende também as luzes em cascata e abre os estores.
+  Para configurar:
+  1. Instale o add-on **Mosquitto** e a integração **MQTT** no Home Assistant.
+  2. Na app Nuki: *Fechadura → Funcionalidades e configuração → MQTT*. Ative-o com o IP do Home Assistant e o utilizador do Mosquitto.
+  3. Para a entidade da fechadura (`lock.porta_entrada`), use a integração **Matter** ou a descoberta automática por MQTT da Nuki.
+  4. Abra a porta com cada telemóvel e veja o sensor **Nuki último evento**. O 3.º número (por exemplo `1,0,`**`123456789`**`,0,0`) é o Auth-ID desse telemóvel.
+  5. No pacote, na automação `casa_boas_vindas_fechadura`, ponha esses números na lista `donos` com o nome de cada pessoa.
+  6. A foto vem da entidade `person` com o mesmo primeiro nome. Defina-a em *Definições → Pessoas*.
 - Os oito equipamentos em órbita são definidos em `custom_fields` (`o1` a `o8`) na vista Montra. Troque `entity`, `name`, `icon` e `cor` à vontade.
 
 ### Notas

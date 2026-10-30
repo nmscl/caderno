@@ -615,7 +615,8 @@ button_card_templates:
 
   # ------------------------------------------------------------------
   #  Orbe: equipamento em órbita no ecrã Montra
-  #  variáveis: cor (RGB). Acende com estado "on" ou "open".
+  #  variáveis: cor (RGB). Acende com estado "on" ou "open" e liga-se
+  #  ao anel central com um raio de luz.
   # ------------------------------------------------------------------
   orbe:
     variables:
@@ -626,6 +627,8 @@ button_card_templates:
       haptic: medium
     hold_action:
       action: more-info
+    custom_fields:
+      raio: "[[[ return '' ]]]"
     styles:
       card:
         - background: none
@@ -633,6 +636,7 @@ button_card_templates:
         - box-shadow: none
         - padding: 0
         - overflow: visible
+        - --c: "[[[ return variables.cor ]]]"
       grid:
         - grid-template-areas: '"i" "n"'
         - grid-template-rows: min-content min-content
@@ -645,7 +649,6 @@ button_card_templates:
         - backdrop-filter: blur(10px)
         - -webkit-backdrop-filter: blur(10px)
         - transition: all 0.5s ease
-        - --c: "[[[ return variables.cor ]]]"
       icon:
         - width: 26px
         - color: rgba(242, 243, 255, 0.55)
@@ -657,6 +660,19 @@ button_card_templates:
         - text-transform: uppercase
         - margin-top: 8px
         - color: rgba(242, 243, 255, 0.6)
+      custom_fields:
+        raio:
+          - position: absolute
+          - left: 50%
+          - top: 29px
+          - height: 2px
+          - width: calc(min(56vmin, 520px) * 0.035 + 21px)
+          - transform-origin: 0 50%
+          - transform: rotate(calc(var(--a, 0deg) + 180deg)) translateX(31px)
+          - background: rgba(255, 255, 255, 0.10)
+          - border-radius: 2px
+          - pointer-events: none
+          - transition: all 0.5s ease
     state:
       - operator: template
         value: "[[[ return entity && (entity.state === 'on' || entity.state === 'open') ]]]"
@@ -670,6 +686,12 @@ button_card_templates:
           name:
             - color: "[[[ return `rgb(${variables.cor})` ]]]"
             - text-shadow: "[[[ return `0 0 12px rgba(${variables.cor},0.8)` ]]]"
+          custom_fields:
+            raio:
+              - background: "[[[ return `linear-gradient(90deg, rgba(${variables.cor},.95), rgba(${variables.cor},.15) 50%, rgba(${variables.cor},.95) 50%, rgba(${variables.cor},.15))` ]]]"
+              - background-size: 200% 100%
+              - box-shadow: "[[[ return `0 0 10px rgba(${variables.cor},.8)` ]]]"
+              - animation: fluir 1.4s linear infinite
       - value: unavailable
         styles:
           card:
@@ -679,6 +701,8 @@ button_card_templates:
         0%   { box-shadow: 0 0 0 0 rgba(var(--c), .55), 0 0 28px rgba(var(--c), .85); }
         100% { box-shadow: 0 0 0 22px rgba(var(--c), 0), 0 0 28px rgba(var(--c), .85); }
       }
+      @keyframes fluir { to { background-position: 200% 0; } }
+      @media (max-width: 500px) { #raio { width: calc(min(56vmin, 520px) * 0.035 + 9px) !important; } }
 
   # ------------------------------------------------------------------
   #  Montra: ecrã de entrada para tablet de parede
@@ -689,6 +713,7 @@ button_card_templates:
       consumo: sensor.casa_consumo_total
       energia_hoje: sensor.casa_energia_hoje
       custo_hoje: sensor.casa_custo_hoje
+      ligados: sensor.casa_dispositivos_ligados
       potencia_max: 6900                        # <-- potência contratada (W)
       ac:
         - climate.ac_sala
@@ -696,11 +721,21 @@ button_card_templates:
       portoes:
         - cover.portao_garagem
         - cover.portao_rua
+      fechadura: lock.porta_entrada             # <-- Nuki Smart Lock Ultra
       ap: binary_sensor.ruijie_ap
       clientes: sensor.ruijie_ap_clientes
       meteo: weather.forecast_casa              # <-- opcional
       boas_vindas: input_boolean.casa_boas_vindas
       boas_vindas_nome: input_text.casa_boas_vindas_nome
+      # Cores do fundo conforme a hora: nascer do sol, dia, fim de tarde, noite
+      paleta: |
+        [[[
+          const h = new Date().getHours();
+          if (h >= 6 && h < 11) return ['#ff7043', '#ffca28', '#ec407a'];
+          if (h >= 11 && h < 18) return ['#00b8d4', '#7c4dff', '#1de9b6'];
+          if (h >= 18 && h < 21) return ['#7c4dff', '#ff4081', '#ff9100'];
+          return ['#283593', '#6a1b9a', '#00838f'];
+        ]]]
     show_icon: false
     show_name: false
     show_state: false
@@ -708,13 +743,25 @@ button_card_templates:
       action: none
     custom_fields:
       fundo: |
-        [[[ return '<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>'; ]]]
+        [[[
+          const p = variables.paleta;
+          let s = `<div class="blob b1" style="background:${p[0]}"></div><div class="blob b2" style="background:${p[1]}"></div>
+                   <div class="blob b3" style="background:${p[2]}"></div>`;
+          for (let i = 0; i < 28; i++) {
+            const t = 1 + (i * 7) % 3;
+            s += `<i class="part" style="left:${(i * 37) % 100}%;width:${t}px;height:${t}px;
+                   animation-duration:${14 + (i * 7) % 16}s;animation-delay:-${(i * 3) % 20}s"></i>`;
+          }
+          return s;
+        ]]]
       anel: |
         [[[
           const s = states[variables.consumo];
           const w = s ? parseFloat(s.state) || 0 : 0;
-          const f = Math.min(w / variables.potencia_max, 1);
+          const f = Math.min(Math.max(w / variables.potencia_max, 0.002), 0.999);
           const r = 150, C = 2 * Math.PI * r;
+          const fim = (-90 + 360 * f) * Math.PI / 180;
+          const ex = 200 + r * Math.cos(fim), ey = 200 + r * Math.sin(fim);
           let ticks = '';
           for (let i = 0; i < 60; i++) {
             const a = i * Math.PI / 30, l = i % 5 ? 6 : 14, r1 = 186, r2 = r1 - l;
@@ -726,14 +773,19 @@ button_card_templates:
               <linearGradient id="gEn" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stop-color="#00e5ff"/><stop offset=".55" stop-color="#7c4dff"/><stop offset="1" stop-color="#ff4081"/>
               </linearGradient>
+              <radialGradient id="gNucleo"><stop offset="0" stop-color="rgba(124,77,255,.28)"/><stop offset="1" stop-color="rgba(124,77,255,0)"/></radialGradient>
               <filter id="brilho" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
               </filter>
             </defs>
+            <circle cx="200" cy="200" r="140" fill="url(#gNucleo)" class="respira"/>
             ${ticks}
             <circle cx="200" cy="200" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="14"/>
             <circle cx="200" cy="200" r="${r}" fill="none" stroke="url(#gEn)" stroke-width="14" stroke-linecap="round"
                     stroke-dasharray="${(C * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 200 200)" filter="url(#brilho)"/>
+            <path class="fluxo" d="M200,50 A${r},${r} 0 ${f > .5 ? 1 : 0} 1 ${ex.toFixed(2)},${ey.toFixed(2)}"
+                  fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 13" opacity=".85"/>
+            <circle class="cometa" cx="${ex.toFixed(2)}" cy="${ey.toFixed(2)}" r="6" fill="#fff" filter="url(#brilho)"/>
             <circle class="gira" cx="200" cy="200" r="124" fill="none" stroke="rgba(124,77,255,.45)" stroke-width="1.2" stroke-dasharray="2 9"/>
             <g class="ponteiro" style="animation-delay:-${new Date().getSeconds()}s">
               <circle cx="200" cy="14" r="5" fill="#00e5ff" filter="url(#brilho)"/>
@@ -745,8 +797,9 @@ button_card_templates:
           const d = new Date(), h = d.getHours();
           const s = h < 6 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite';
           const w = states[variables.consumo] ? Math.round(parseFloat(states[variables.consumo].state) || 0) : '—';
+          const hh = String(h).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
           return `<div class="saud">${s}</div>
-                  <div class="hora">${d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div class="hora">${hh}<span class="dp">:</span>${mm}</div>
                   <div class="data">${d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                   <div class="watts"><ha-icon icon="mdi:flash"></ha-icon>${w} W</div>`;
         ]]]
@@ -762,12 +815,15 @@ button_card_templates:
         ]]]
       estado: |
         [[[
+          const l = states[variables.fechadura];
+          const tr = l && l.state === 'locked';
+          const porta = !l ? '' : `<div class="pill ${tr ? '' : 'aviso'}"><ha-icon icon="mdi:${tr ? 'lock' : 'lock-open-variant'}"></ha-icon>${tr ? 'Porta trancada' : l.state === 'unavailable' ? 'Fechadura sem ligação' : 'Porta destrancada'}</div>`;
           const abertos = variables.portoes.filter((id) => states[id] && !['closed', 'unavailable'].includes(states[id].state));
           const ap = states[variables.ap], on = ap && ap.state === 'on';
           const cli = states[variables.clientes] ? states[variables.clientes].state : '—';
-          return (abertos.length
+          return porta + (abertos.length
               ? `<div class="pill alerta"><ha-icon icon="mdi:garage-alert-variant"></ha-icon>${abertos.length === 1 ? (states[abertos[0]].attributes.friendly_name || 'Portão') + ' aberto' : abertos.length + ' portões abertos'}</div>`
-              : `<div class="pill"><ha-icon icon="mdi:shield-home"></ha-icon>Casa segura</div>`)
+              : `<div class="pill"><ha-icon icon="mdi:garage-lock"></ha-icon>Portões fechados</div>`)
             + `<div class="pill"><span class="ponto ${on ? 'on' : 'off'}"></span>Wi-Fi · ${on ? cli + ' dispositivos' : 'offline'}</div>`;
         ]]]
       clima: |
@@ -793,14 +849,33 @@ button_card_templates:
           const b = states[variables.boas_vindas];
           if (!b || b.state !== 'on') return '';
           const n = states[variables.boas_vindas_nome];
-          const nome = n && n.state && !['unknown', ''].includes(n.state) ? n.state.split(' ')[0] : '';
-          const ac = states[variables.ac[0]];
-          const t = ac && ac.attributes.current_temperature != null ? Number(ac.attributes.current_temperature).toFixed(1) + '° na sala' : '';
+          const nome = n && n.state && !['unknown', 'unavailable', ''].includes(n.state) ? n.state.trim().split(' ')[0] : '';
+          const h = new Date().getHours();
+          const saud = h < 6 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite';
+          // Foto da pessoa (entidade person.* com o mesmo primeiro nome)
+          const pessoa = Object.values(states).find((s) => s.entity_id.startsWith('person.') &&
+                           (s.attributes.friendly_name || '').split(' ')[0].toLowerCase() === nome.toLowerCase());
+          const foto = pessoa && pessoa.attributes.entity_picture;
+          const avatar = foto ? `<img src="${foto}" alt="">` : `<span>${(nome || '♥').charAt(0)}</span>`;
+          const letras = [...(nome || 'Olá')].map((c, i) => `<span style="animation-delay:${0.9 + i * 0.08}s">${c}</span>`).join('');
+          let burst = '';
+          for (let i = 0; i < 36; i++) {
+            const cores = ['#00e5ff', '#b388ff', '#ff4081', '#ffd54f'];
+            burst += `<i style="--ang:${i * 10}deg;--dist:${28 + (i * 13) % 22}vmin;background:${cores[i % 4]};animation-delay:${0.2 + (i % 6) * 0.04}s"></i>`;
+          }
+          const ac = states[variables.ac[0]], w = states[variables.meteo];
+          const abertos = variables.portoes.filter((id) => states[id] && !['closed', 'unavailable'].includes(states[id].state)).length;
+          const chips = [
+            ac && ac.attributes.current_temperature != null ? ['home-thermometer', Number(ac.attributes.current_temperature).toFixed(1) + '° na sala'] : null,
+            w ? ['weather-partly-cloudy', Math.round(w.attributes.temperature) + '° lá fora'] : null,
+            abertos ? ['garage-alert-variant', abertos === 1 ? '1 portão aberto' : abertos + ' portões abertos'] : ['garage-lock', 'Portões fechados'],
+          ].filter(Boolean).map(([i, t], k) => `<div class="chip" style="animation-delay:${1.8 + k * 0.15}s"><ha-icon icon="mdi:${i}"></ha-icon>${t}</div>`).join('');
           return `<div class="bv">
-                    <div class="onda o1"></div><div class="onda o2"></div><div class="onda o3"></div>
-                    <div class="bv-sub">Bem-vindo a casa</div>
-                    <div class="bv-nome">${nome || 'Olá!'}</div>
-                    <div class="bv-info">${[t, 'luzes acesas', 'estores a abrir'].filter(Boolean).join(' · ')}</div>
+                    <div class="burst">${burst}</div>
+                    <div class="avatar">${avatar}</div>
+                    <div class="bv-sub">${saud}</div>
+                    <div class="bv-nome">${letras}</div>
+                    <div class="bv-chips">${chips}</div>
                   </div>`;
         ]]]
     styles:
@@ -826,6 +901,7 @@ button_card_templates:
         fundo:
           - position: absolute
           - inset: 0
+          - overflow: hidden
           - pointer-events: none
         anel:
           - position: absolute
@@ -875,74 +951,13 @@ button_card_templates:
           - margin: -46px 0 0 -42px
           - z-index: 2
           - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o2:
-          - --a: -45deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o3:
-          - --a: 0deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o4:
-          - --a: 45deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o5:
-          - --a: 90deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o6:
-          - --a: 135deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o7:
-          - --a: 180deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        o8:
-          - --a: 225deg
-          - position: absolute
-          - left: 50%
-          - top: 50%
-          - width: 84px
-          - margin: -46px 0 0 -42px
-          - z-index: 2
-          - transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))
-        espetaculo:
-          - position: absolute
-          - right: 24px
-          - bottom: 124px
-          - z-index: 3
+        o2: [--a: -45deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
+        o3: [--a: 0deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
+        o4: [--a: 45deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
+        o5: [--a: 90deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
+        o6: [--a: 135deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
+        o7: [--a: 180deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
+        o8: [--a: 225deg, position: absolute, left: 50%, top: 50%, width: 84px, "margin: -46px 0 0 -42px", z-index: 2, "transform: rotate(var(--a)) translate(calc(min(56vmin, 520px) / 2 + 52px)) rotate(calc(-1 * var(--a)))"]
         boasvindas:
           - position: absolute
           - inset: 0
@@ -952,22 +967,35 @@ button_card_templates:
       @keyframes deriva1 { to { transform: translate(18vw, 12vh) scale(1.2); } }
       @keyframes deriva2 { to { transform: translate(-16vw, -10vh) scale(.85); } }
       @keyframes deriva3 { to { transform: translate(10vw, -14vh) scale(1.15); } }
+      @keyframes subir { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: .8; } 90% { opacity: .5; } 100% { transform: translateY(-105vh); opacity: 0; } }
       @keyframes rodar { to { transform: rotate(360deg); } }
+      @keyframes correr { to { stroke-dashoffset: -28; } }
+      @keyframes respirar { 50% { opacity: .45; transform: scale(.94); } }
+      @keyframes piscar-dp { 50% { opacity: .25; } }
+      @keyframes cometa { 50% { r: 9; opacity: .7; } }
       @keyframes pulsar { 0% { box-shadow: 0 0 0 0 rgba(105,240,174,.7); } 70% { box-shadow: 0 0 0 8px rgba(105,240,174,0); } 100% { box-shadow: 0 0 0 0 rgba(105,240,174,0); } }
-      @keyframes bv-entra { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes bv-nome { from { opacity: 0; transform: scale(.7); filter: blur(18px); letter-spacing: .4em; } to { opacity: 1; transform: none; filter: none; letter-spacing: -.02em; } }
+      @keyframes bv-entra { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; backdrop-filter: blur(14px); } }
+      @keyframes bv-sai { to { opacity: 0; } }
+      @keyframes letra { from { opacity: 0; transform: translateY(.4em) rotateX(80deg); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
       @keyframes bv-sobe { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
-      @keyframes onda { from { transform: scale(.2); opacity: .9; } to { transform: scale(3.2); opacity: 0; } }
-      .blob { position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%; filter: blur(90px); opacity: .45; }
-      .b1 { background: #7c4dff; left: -20vmax; top: -25vmax; animation: deriva1 26s ease-in-out infinite alternate; }
-      .b2 { background: #00b8d4; right: -22vmax; top: 5vmax; animation: deriva2 32s ease-in-out infinite alternate; }
-      .b3 { background: #ff4081; left: 15vmax; bottom: -35vmax; opacity: .3; animation: deriva3 38s ease-in-out infinite alternate; }
+      @keyframes avatar { 0% { opacity: 0; transform: scale(.3); } 60% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
+      @keyframes anel-avatar { to { transform: rotate(360deg); } }
+      @keyframes explodir { 0% { transform: rotate(var(--ang)) translateX(0) scale(1); opacity: 1; } 100% { transform: rotate(var(--ang)) translateX(var(--dist)) scale(.2); opacity: 0; } }
+      .blob { position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%; filter: blur(90px); opacity: .45; transition: background 4s ease; }
+      .b1 { left: -20vmax; top: -25vmax; animation: deriva1 26s ease-in-out infinite alternate; }
+      .b2 { right: -22vmax; top: 5vmax; animation: deriva2 32s ease-in-out infinite alternate; }
+      .b3 { left: 15vmax; bottom: -35vmax; opacity: .3; animation: deriva3 38s ease-in-out infinite alternate; }
+      .part { position: absolute; bottom: -10px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff; animation: subir linear infinite; }
       #anel svg { width: 100%; height: 100%; overflow: visible; }
       .gira { transform-origin: 200px 200px; animation: rodar 90s linear infinite; }
       .ponteiro { transform-origin: 200px 200px; animation: rodar 60s linear infinite; }
+      .fluxo { animation: correr 1.2s linear infinite; }
+      .cometa { animation: cometa 1.6s ease-in-out infinite; }
+      .respira { transform-origin: 200px 200px; animation: respirar 6s ease-in-out infinite; }
       .saud { font-size: min(2.6vmin, 20px); letter-spacing: .3em; text-transform: uppercase; opacity: .7; }
-      .hora { font-size: min(14vmin, 128px); font-weight: 200; letter-spacing: -.04em; line-height: 1;
+      .hora { font-size: min(14vmin, 128px); font-weight: 200; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums;
               background: linear-gradient(180deg, #fff 30%, #b9a6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .dp { animation: piscar-dp 2s steps(1) infinite; }
       .data { font-size: min(2.6vmin, 18px); opacity: .7; margin-top: 4px; }
       .data::first-letter { text-transform: uppercase; }
       .watts { display: inline-flex; align-items: center; gap: 4px; margin-top: 14px; padding: 6px 14px; border-radius: 999px;
@@ -979,6 +1007,7 @@ button_card_templates:
       .pill { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; font-weight: 600; font-size: 13px;
               background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(12px); }
       .pill ha-icon { --mdc-icon-size: 18px; color: #69f0ae; }
+      .pill.aviso ha-icon { color: #ffd54f; }
       .pill.alerta { background: rgba(255,145,0,.9); color: #10111f; border-color: transparent; }
       .pill.alerta ha-icon { color: #10111f; }
       .ponto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
@@ -991,24 +1020,32 @@ button_card_templates:
       .linha b { font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; }
       .linha .sub { opacity: .5; font-size: 12px; }
       .bv { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-            background: radial-gradient(circle at 50% 50%, rgba(124,77,255,.55), rgba(5,6,13,.92) 65%);
-            animation: bv-entra .8s ease both; overflow: hidden; }
-      .onda { position: absolute; left: 50%; top: 50%; width: 40vmin; height: 40vmin; margin: -20vmin 0 0 -20vmin; border-radius: 50%;
-              border: 2px solid rgba(0,229,255,.7); animation: onda 3s ease-out infinite; }
-      .o2 { animation-delay: 1s; border-color: rgba(255,64,129,.6); }
-      .o3 { animation-delay: 2s; border-color: rgba(124,77,255,.7); }
-      .bv-sub { font-size: min(3.4vmin, 26px); letter-spacing: .4em; text-transform: uppercase; opacity: .85; animation: bv-sobe .8s .3s ease both; }
-      .bv-nome { font-size: min(18vmin, 170px); font-weight: 700; line-height: 1.05;
-                 background: linear-gradient(90deg, #00e5ff, #b388ff, #ff4081); -webkit-background-clip: text; background-clip: text; color: transparent;
-                 animation: bv-nome 1.4s .5s cubic-bezier(.2,.8,.2,1) both; }
-      .bv-info { font-size: min(2.8vmin, 20px); opacity: .8; margin-top: 12px; animation: bv-sobe .8s 1.6s ease both; }
+            background: radial-gradient(circle at 50% 45%, rgba(124,77,255,.5), rgba(5,6,13,.9) 60%);
+            animation: bv-entra .9s ease both, bv-sai .8s 18.6s ease forwards; overflow: hidden; perspective: 600px; }
+      .burst { position: absolute; left: 50%; top: 38%; }
+      .burst i { position: absolute; width: 8px; height: 8px; margin: -4px; border-radius: 50%; box-shadow: 0 0 12px currentColor;
+                 animation: explodir 1.6s cubic-bezier(.1,.7,.3,1) both; }
+      .avatar { position: relative; width: min(22vmin, 170px); height: min(22vmin, 170px); border-radius: 50%; display: grid; place-items: center;
+                margin-bottom: 18px; animation: avatar 1s .2s cubic-bezier(.2,.9,.3,1.2) both; }
+      .avatar::before { content: ""; position: absolute; inset: -6px; border-radius: 50%;
+                        background: conic-gradient(#00e5ff, #7c4dff, #ff4081, #ffd54f, #00e5ff); animation: anel-avatar 4s linear infinite;
+                        filter: drop-shadow(0 0 18px rgba(124,77,255,.8)); }
+      .avatar img, .avatar span { position: relative; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 4px solid #05060d; }
+      .avatar span { display: grid; place-items: center; background: #14162c; font-size: min(10vmin, 80px); font-weight: 700; }
+      .bv-sub { font-size: min(3.6vmin, 28px); letter-spacing: .4em; text-transform: uppercase; opacity: .9; animation: bv-sobe .8s .6s ease both; }
+      .bv-nome { font-size: min(17vmin, 160px); font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+      .bv-nome span { display: inline-block; animation: letra .7s cubic-bezier(.2,.8,.2,1) both;
+                      background: linear-gradient(90deg, #00e5ff, #b388ff, #ff4081); background-size: 400% 100%;
+                      -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .bv-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; padding: 0 16px; }
+      .chip { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; font-size: min(2.4vmin, 16px); font-weight: 600;
+              background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); animation: bv-sobe .7s ease both; }
+      .chip ha-icon { --mdc-icon-size: 18px; color: #00e5ff; }
       @media (max-width: 700px) {
         #clima, #energia { min-width: 0; padding: 10px 12px; }
         .linha b { font-size: 17px; }
         #meteo b { font-size: 26px; }
         #meteo ha-icon { --mdc-icon-size: 34px; }
-        #espetaculo { right: auto !important; bottom: auto !important; left: 50%; transform: translateX(-50%);
-                      top: calc(50% + min(28vmin, 260px) + 92px); }
       }
       @media (max-width: 500px) {
         #o1, #o2, #o3, #o4, #o5, #o6, #o7, #o8 {
@@ -1120,37 +1157,8 @@ views:
                   entity_id: cover.portao_rua
                 confirmation:
                   text: Acionar o portão da rua?
-          espetaculo:
-            card:
-              type: custom:button-card
-              name: Espetáculo
-              icon: mdi:creation
-              tap_action:
-                action: perform-action
-                perform_action: script.casa_boas_vindas
-                data:
-                  luzes: true
-                haptic: success
-              styles:
-                card:
-                  - padding: 10px 20px 10px 14px
-                  - border-radius: 999px
-                  - background: linear-gradient(90deg, rgba(0,229,255,.25), rgba(124,77,255,.35), rgba(255,64,129,.25))
-                  - border: 1px solid rgba(255,255,255,.25)
-                  - box-shadow: 0 0 30px rgba(124,77,255,.45)
-                  - backdrop-filter: blur(12px)
-                grid:
-                  - grid-template-areas: '"i n"'
-                  - column-gap: 8px
-                icon:
-                  - width: 20px
-                  - color: "#fff"
-                name:
-                  - font-size: 14px
-                  - font-weight: 700
-                  - letter-spacing: 1px
-                  - color: "#fff"
 
+  # -------------------------------------------------------------------
   - title: Início
     path: inicio
     icon: mdi:home-variant

@@ -1,0 +1,248 @@
+# =====================================================================
+#  Pacote de apoio ao dashboard "Casa"
+#  Sonoff · Shelly · Ar condicionado Wi-Fi · AP Ruijie
+#
+#  Substitua os IDs de entidade marcados com  # <-- pelos seus.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+#  Grupos (usados para contar o que está ligado e para "desligar tudo")
+# ---------------------------------------------------------------------
+group:
+  casa_luzes_tomadas:
+    name: Luzes e tomadas
+    entities:
+      - light.sala               # <-- Sonoff
+      - light.cozinha            # <-- Sonoff
+      - light.quarto             # <-- Sonoff
+      - switch.sonoff_jardim     # <-- Sonoff
+      - switch.shelly_maquina_lavar     # <-- Shelly Plug
+      - switch.shelly_termoacumulador   # <-- Shelly 1PM
+
+  casa_luzes:
+    name: Luzes
+    entities:
+      - light.sala
+      - light.cozinha
+      - light.quarto
+      - switch.sonoff_jardim
+
+  casa_ar_condicionado:
+    name: Ar condicionado
+    entities:
+      - climate.ac_sala          # <--
+      - climate.ac_quarto        # <--
+
+  casa_estores:
+    name: Estores
+    entities:
+      - cover.shelly_estore_sala     # <-- Shelly 2PM / 2.5
+      - cover.shelly_estore_quarto   # <--
+
+  # Sensores de potência (W) dos Shelly. Se tiver um Shelly EM / Pro 3EM
+  # a medir o quadro geral, deixe apenas esse sensor aqui.
+  casa_sensores_potencia:
+    name: Sensores de potência
+    entities:
+      - sensor.shelly_maquina_lavar_power     # <--
+      - sensor.shelly_termoacumulador_power   # <--
+
+# ---------------------------------------------------------------------
+#  Preço da eletricidade (ajustável no próprio dashboard)
+# ---------------------------------------------------------------------
+input_number:
+  casa_preco_kwh:
+    name: Preço do kWh
+    icon: mdi:currency-eur
+    min: 0
+    max: 1
+    step: 0.001
+    unit_of_measurement: "€/kWh"
+    mode: box
+
+# ---------------------------------------------------------------------
+#  Sensores calculados
+# ---------------------------------------------------------------------
+template:
+  - sensor:
+      - name: Casa consumo total
+        unique_id: casa_consumo_total
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ expand('group.casa_sensores_potencia')
+             | map(attribute='state') | map('float', 0) | sum | round(0) }}
+
+      - name: Casa dispositivos ligados
+        unique_id: casa_dispositivos_ligados
+        icon: mdi:power-plug
+        state: >
+          {{ expand('group.casa_luzes_tomadas')
+             | selectattr('state', 'eq', 'on') | list | count }}
+
+      - name: Casa custo hoje
+        unique_id: casa_custo_hoje
+        unit_of_measurement: "€"
+        icon: mdi:cash
+        state: >
+          {{ (states('sensor.casa_energia_hoje') | float(0)
+              * states('input_number.casa_preco_kwh') | float(0)) | round(2) }}
+
+      # Dispositivos ligados ao Wi-Fi. Por omissão conta os device_tracker
+      # em casa; se o seu AP Ruijie expuser o nº de clientes por SNMP,
+      # troque o estado pelo valor desse sensor.
+      - name: Ruijie AP clientes
+        unique_id: ruijie_ap_clientes
+        icon: mdi:devices
+        state_class: measurement
+        state: >
+          {{ states.device_tracker | selectattr('state', 'eq', 'home') | list | count }}
+
+      - name: Ruijie AP download
+        unique_id: ruijie_ap_download
+        unit_of_measurement: Mbit/s
+        icon: mdi:download
+        state_class: measurement
+        state: >
+          {{ (states('sensor.ruijie_ap_rx_taxa') | float(0) * 8 / 1000000) | round(1) }}
+        availability: "{{ has_value('sensor.ruijie_ap_rx_taxa') }}"
+
+      - name: Ruijie AP upload
+        unique_id: ruijie_ap_upload
+        unit_of_measurement: Mbit/s
+        icon: mdi:upload
+        state_class: measurement
+        state: >
+          {{ (states('sensor.ruijie_ap_tx_taxa') | float(0) * 8 / 1000000) | round(1) }}
+        availability: "{{ has_value('sensor.ruijie_ap_tx_taxa') }}"
+
+sensor:
+  # Energia acumulada a partir da potência total (Riemann)
+  - platform: integration
+    source: sensor.casa_consumo_total
+    name: Casa energia total
+    unique_id: casa_energia_total
+    unit_prefix: k
+    unit_time: h
+    method: left
+    round: 3
+
+  # -------------------------------------------------------------------
+  #  AP Ruijie via SNMP (ative SNMP v2c no AP / Ruijie Cloud).
+  #  Se o seu modelo não tiver SNMP, apague este bloco: o dashboard
+  #  continua a funcionar só com o sensor de ping.
+  # -------------------------------------------------------------------
+  - platform: snmp
+    name: Ruijie AP uptime
+    unique_id: ruijie_ap_uptime
+    host: 192.168.1.2            # <-- IP do AP
+    community: public            # <--
+    version: 2c
+    baseoid: 1.3.6.1.2.1.1.3.0   # sysUpTime (centésimos de segundo)
+    accept_errors: true
+    unit_of_measurement: d
+    value_template: "{{ (value | int(0) / 8640000) | round(1) }}"
+
+  - platform: snmp
+    name: Ruijie AP rx bytes
+    unique_id: ruijie_ap_rx_bytes
+    host: 192.168.1.2
+    community: public
+    version: 2c
+    baseoid: 1.3.6.1.2.1.31.1.1.1.6.1    # ifHCInOctets da interface 1 (uplink)
+    accept_errors: true
+    unit_of_measurement: B
+
+  - platform: snmp
+    name: Ruijie AP tx bytes
+    unique_id: ruijie_ap_tx_bytes
+    host: 192.168.1.2
+    community: public
+    version: 2c
+    baseoid: 1.3.6.1.2.1.31.1.1.1.10.1   # ifHCOutOctets da interface 1
+    accept_errors: true
+    unit_of_measurement: B
+
+  - platform: derivative
+    source: sensor.ruijie_ap_rx_bytes
+    name: Ruijie AP rx taxa
+    unique_id: ruijie_ap_rx_taxa
+    unit_time: s
+    time_window: "00:00:30"
+
+  - platform: derivative
+    source: sensor.ruijie_ap_tx_bytes
+    name: Ruijie AP tx taxa
+    unique_id: ruijie_ap_tx_taxa
+    unit_time: s
+    time_window: "00:00:30"
+
+utility_meter:
+  casa_energia_hoje:
+    name: Casa energia hoje
+    unique_id: casa_energia_hoje
+    source: sensor.casa_energia_total
+    cycle: daily
+
+# ---------------------------------------------------------------------
+#  Cenas rápidas (botões grandes no topo do dashboard)
+# ---------------------------------------------------------------------
+script:
+  casa_sair:
+    alias: Sair de casa
+    icon: mdi:exit-run
+    sequence:
+      - action: homeassistant.turn_off
+        target:
+          entity_id: group.casa_luzes_tomadas
+      - action: climate.turn_off
+        target:
+          entity_id: group.casa_ar_condicionado
+      - action: cover.close_cover
+        target:
+          entity_id: group.casa_estores
+
+  casa_cheguei:
+    alias: Cheguei
+    icon: mdi:home-heart
+    sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.sala
+      - action: cover.open_cover
+        target:
+          entity_id: group.casa_estores
+
+  casa_noite:
+    alias: Modo noite
+    icon: mdi:weather-night
+    sequence:
+      - action: homeassistant.turn_off
+        target:
+          entity_id: group.casa_luzes
+      - action: cover.close_cover
+        target:
+          entity_id: group.casa_estores
+      - action: climate.turn_off
+        target:
+          entity_id: climate.ac_sala
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.ac_quarto
+        data:
+          temperature: 24
+
+  casa_conforto:
+    alias: Conforto 22°
+    icon: mdi:sofa
+    sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: climate.ac_sala
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.ac_sala
+        data:
+          temperature: 22

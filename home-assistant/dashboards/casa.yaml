@@ -1,0 +1,897 @@
+# =====================================================================
+#  Dashboard "Casa" — Sonoff · Shelly · Ar condicionado · Ruijie
+#
+#  Requer (HACS → Frontend):  button-card · mini-graph-card · card-mod
+#  Tema recomendado:          neon_glass  (themes/neon_glass.yaml)
+#
+#  Uso:  tocar  = ligar/desligar
+#        manter = abrir detalhes
+# =====================================================================
+
+button_card_templates:
+
+  # ------------------------------------------------------------------
+  #  Base: cartão de vidro
+  # ------------------------------------------------------------------
+  vidro:
+    styles:
+      card:
+        - border-radius: 24px
+        - background: rgba(255, 255, 255, 0.05)
+        - backdrop-filter: blur(18px) saturate(140%)
+        - -webkit-backdrop-filter: blur(18px) saturate(140%)
+        - border: 1px solid rgba(255, 255, 255, 0.08)
+        - box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35)
+        - transition: all 0.35s ease
+        - color: "#f2f3ff"
+
+  # ------------------------------------------------------------------
+  #  Dispositivo on/off (Sonoff, Shelly)
+  #  variáveis: cor (RGB), potencia (sensor W opcional)
+  # ------------------------------------------------------------------
+  dispositivo:
+    template: vidro
+    variables:
+      cor: "255, 183, 77"
+      potencia: ""
+    show_state: false
+    show_label: true
+    tap_action:
+      action: toggle
+      haptic: medium
+    hold_action:
+      action: more-info
+    label: |
+      [[[
+        if (!entity) return 'Entidade não encontrada';
+        if (entity.state === 'unavailable') return 'Indisponível';
+        if (entity.state !== 'on') return 'Desligado';
+        const b = entity.attributes.brightness;
+        return b ? `Ligado · ${Math.round(b / 2.55)}%` : 'Ligado';
+      ]]]
+    custom_fields:
+      extra: |
+        [[[
+          if (!variables.potencia || !states[variables.potencia]) return '';
+          const w = parseFloat(states[variables.potencia].state);
+          if (isNaN(w)) return '';
+          return `<ha-icon icon="mdi:flash" style="--mdc-icon-size:14px"></ha-icon>${Math.round(w)} W`;
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: '"i extra" "n n" "l l"'
+        - grid-template-columns: 1fr auto
+        - grid-template-rows: 1fr min-content min-content
+      card:
+        - padding: 16px
+        - height: 128px
+      img_cell:
+        - justify-self: start
+        - align-self: start
+        - width: 46px
+        - height: 46px
+        - border-radius: 15px
+        - background: rgba(255, 255, 255, 0.08)
+        - transition: all 0.35s ease
+      icon:
+        - width: 24px
+        - color: rgba(242, 243, 255, 0.6)
+      name:
+        - justify-self: start
+        - font-size: 15px
+        - font-weight: 600
+        - margin-top: 10px
+      label:
+        - justify-self: start
+        - font-size: 12px
+        - color: rgba(242, 243, 255, 0.55)
+      custom_fields:
+        extra:
+          - align-self: start
+          - display: flex
+          - align-items: center
+          - gap: 2px
+          - font-size: 12px
+          - font-weight: 600
+          - padding: 4px 9px
+          - border-radius: 999px
+          - background: rgba(0, 0, 0, 0.25)
+    state:
+      - value: "on"
+        styles:
+          card:
+            - background: "[[[ return `linear-gradient(135deg, rgba(${variables.cor},0.38), rgba(${variables.cor},0.06))` ]]]"
+            - border: "[[[ return `1px solid rgba(${variables.cor},0.55)` ]]]"
+            - box-shadow: "[[[ return `0 0 28px rgba(${variables.cor},0.30), inset 0 0 24px rgba(${variables.cor},0.10)` ]]]"
+          img_cell:
+            - background: "[[[ return `rgb(${variables.cor})` ]]]"
+            - box-shadow: "[[[ return `0 0 18px rgba(${variables.cor},0.9)` ]]]"
+          icon:
+            - color: "#10111f"
+          label:
+            - color: "[[[ return `rgb(${variables.cor})` ]]]"
+            - font-weight: 600
+      - value: unavailable
+        styles:
+          card:
+            - opacity: 0.4
+
+  luz:
+    template: dispositivo
+    variables:
+      cor: "255, 183, 77"
+
+  tomada:
+    template: dispositivo
+    variables:
+      cor: "0, 229, 255"
+
+  # ------------------------------------------------------------------
+  #  Ação rápida (executa um script)
+  #  variáveis: cor (RGB) · cada cartão define o seu tap_action
+  # ------------------------------------------------------------------
+  acao:
+    template: vidro
+    variables:
+      cor: "124, 77, 255"
+    show_state: false
+    styles:
+      grid:
+        - grid-template-areas: '"i" "n"'
+        - grid-template-rows: 1fr min-content
+      card:
+        - padding: 16px 6px 14px
+        - height: 112px
+      img_cell:
+        - width: 52px
+        - height: 52px
+        - border-radius: 50%
+        - background: "[[[ return `radial-gradient(circle at 30% 30%, rgba(${variables.cor},1), rgba(${variables.cor},0.45))` ]]]"
+        - box-shadow: "[[[ return `0 6px 22px rgba(${variables.cor},0.55)` ]]]"
+      icon:
+        - width: 26px
+        - color: white
+      name:
+        - font-size: 13px
+        - font-weight: 600
+        - margin-top: 10px
+
+  # ------------------------------------------------------------------
+  #  Ar condicionado — cor muda com o modo, ventoinha gira
+  # ------------------------------------------------------------------
+  clima:
+    template: vidro
+    variables:
+      rgb: |
+        [[[
+          const m = { cool: '0, 200, 255', heat: '255, 120, 64', heat_cool: '105, 240, 174',
+                      auto: '105, 240, 174', dry: '130, 170, 255', fan_only: '180, 140, 255' };
+          return (entity && m[entity.state]) || '150, 152, 175';
+        ]]]
+    icon: mdi:fan
+    show_state: false
+    show_label: true
+    tap_action:
+      action: more-info
+    label: |
+      [[[
+        if (!entity) return 'Entidade não encontrada';
+        const m = { off: 'Desligado', cool: 'Arrefecer', heat: 'Aquecer', heat_cool: 'Automático',
+                    auto: 'Automático', dry: 'Desumidificar', fan_only: 'Ventilação',
+                    unavailable: 'Indisponível' };
+        const f = entity.attributes.fan_mode;
+        return (m[entity.state] || entity.state) + (entity.state !== 'off' && f ? ` · ${f}` : '');
+      ]]]
+    custom_fields:
+      temp: |
+        [[[
+          const t = entity && entity.attributes.current_temperature;
+          return t != null ? `${Number(t).toFixed(1)}<span class="grau">°</span>` : '—';
+        ]]]
+      alvo: |
+        [[[
+          if (!entity || entity.state === 'off') return 'Toque para ligar';
+          const t = entity.attributes.temperature;
+          return t != null ? `<ha-icon icon="mdi:target" style="--mdc-icon-size:15px"></ha-icon> ${t}°` : '';
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: '"i temp" "n temp" "l alvo"'
+        - grid-template-columns: 1fr auto
+        - grid-template-rows: 1fr min-content min-content
+      card:
+        - padding: 18px
+        - height: 150px
+        - background: "[[[ return `linear-gradient(135deg, rgba(${variables.rgb},0.40), rgba(${variables.rgb},0.05))` ]]]"
+        - border: "[[[ return `1px solid rgba(${variables.rgb},0.45)` ]]]"
+        - box-shadow: "[[[ return entity && entity.state !== 'off' ? `0 0 34px rgba(${variables.rgb},0.35)` : '0 8px 32px rgba(0,0,0,0.35)' ]]]"
+      img_cell:
+        - justify-self: start
+        - align-self: start
+        - width: 50px
+        - height: 50px
+        - border-radius: 50%
+        - background: "[[[ return `rgba(${variables.rgb},0.9)` ]]]"
+        - box-shadow: "[[[ return `0 0 20px rgba(${variables.rgb},0.8)` ]]]"
+      icon:
+        - width: 28px
+        - color: "#10111f"
+        - animation: |
+            [[[
+              if (!entity || entity.state === 'off' || entity.state === 'unavailable') return 'none';
+              const f = String(entity.attributes.fan_mode || '').toLowerCase();
+              const s = /high|alto|max|turbo/.test(f) ? 0.7 : /low|baixo|silent|quiet/.test(f) ? 2.2 : 1.3;
+              return `girar ${s}s linear infinite`;
+            ]]]
+      name:
+        - justify-self: start
+        - font-size: 16px
+        - font-weight: 700
+        - margin-top: 10px
+      label:
+        - justify-self: start
+        - font-size: 12px
+        - color: rgba(242, 243, 255, 0.7)
+      custom_fields:
+        temp:
+          - align-self: center
+          - font-size: 48px
+          - font-weight: 200
+          - letter-spacing: -2px
+          - line-height: 1
+        alvo:
+          - justify-self: end
+          - display: flex
+          - align-items: center
+          - gap: 4px
+          - font-size: 13px
+          - font-weight: 600
+          - padding: 4px 10px
+          - border-radius: 999px
+          - background: rgba(0, 0, 0, 0.25)
+    extra_styles: |
+      @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      .grau { font-size: 26px; vertical-align: top; opacity: .7; }
+
+  # ------------------------------------------------------------------
+  #  KPI (número grande com gradiente)
+  #  variáveis: cor1, cor2 (hex), casas (decimais)
+  # ------------------------------------------------------------------
+  kpi:
+    template: vidro
+    variables:
+      cor1: "#00e5ff"
+      cor2: "#7c4dff"
+      casas: 0
+    show_state: false
+    tap_action:
+      action: more-info
+    custom_fields:
+      valor: |
+        [[[
+          const v = entity ? parseFloat(entity.state) : NaN;
+          if (isNaN(v)) return '—';
+          const u = entity.attributes.unit_of_measurement || '';
+          const n = v.toLocaleString('pt-PT', { minimumFractionDigits: variables.casas, maximumFractionDigits: variables.casas });
+          return `<span style="font-size:34px;font-weight:700;letter-spacing:-1px;
+                    background:linear-gradient(90deg,${variables.cor1},${variables.cor2});
+                    -webkit-background-clip:text;background-clip:text;color:transparent">${n}</span><span
+                    style="font-size:14px;margin-left:4px;opacity:.6">${u}</span>`;
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: '"i" "valor" "n"'
+        - grid-template-rows: min-content 1fr min-content
+      card:
+        - padding: 16px
+        - height: 128px
+      img_cell:
+        - justify-self: start
+      icon:
+        - width: 22px
+        - color: "[[[ return variables.cor1 ]]]"
+      name:
+        - justify-self: start
+        - font-size: 12px
+        - color: rgba(242, 243, 255, 0.6)
+      custom_fields:
+        valor:
+          - justify-self: start
+          - align-self: end
+
+  # ------------------------------------------------------------------
+  #  Cabeçalho com saudação, hora e resumo da casa
+  # ------------------------------------------------------------------
+  cabecalho:
+    template: vidro
+    entity: sensor.time
+    triggers_update: all
+    variables:
+      ac: climate.ac_sala                       # <-- temperatura interior
+      consumo: sensor.casa_consumo_total
+      ligados: sensor.casa_dispositivos_ligados
+      ap: binary_sensor.ruijie_ap               # <-- sensor de ping do AP
+      clientes: sensor.ruijie_ap_clientes
+      meteo: weather.forecast_casa              # <-- opcional
+    show_icon: false
+    show_name: false
+    show_state: false
+    tap_action:
+      action: none
+    custom_fields:
+      saudacao: |
+        [[[
+          const h = new Date().getHours();
+          const s = h < 6 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite';
+          const nome = hass.user && hass.user.name ? hass.user.name.split(' ')[0] : '';
+          return `${s}${nome ? ', ' + nome : ''} 👋`;
+        ]]]
+      hora: |
+        [[[ return new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }); ]]]
+      data: |
+        [[[ return new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }); ]]]
+      meteo: |
+        [[[
+          const w = states[variables.meteo];
+          if (!w) return '';
+          const i = { 'sunny': 'weather-sunny', 'clear-night': 'weather-night', 'cloudy': 'weather-cloudy',
+                      'partlycloudy': 'weather-partly-cloudy', 'rainy': 'weather-rainy', 'pouring': 'weather-pouring',
+                      'fog': 'weather-fog', 'windy': 'weather-windy', 'snowy': 'weather-snowy',
+                      'lightning': 'weather-lightning', 'lightning-rainy': 'weather-lightning-rainy' };
+          return `<ha-icon icon="mdi:${i[w.state] || 'weather-cloudy'}"></ha-icon>
+                  <span>${Math.round(w.attributes.temperature)}°</span>`;
+        ]]]
+      resumo: |
+        [[[
+          const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return isNaN(v) ? '—' : Math.round(v); };
+          const ac = states[variables.ac];
+          const t = ac && ac.attributes.current_temperature != null ? Number(ac.attributes.current_temperature).toFixed(1) + '°' : '—';
+          const ap = states[variables.ap];
+          const on = ap && ap.state === 'on';
+          return `
+            <div class="chip"><ha-icon icon="mdi:home-thermometer"></ha-icon>${t}</div>
+            <div class="chip"><ha-icon icon="mdi:flash"></ha-icon>${num(variables.consumo)} W</div>
+            <div class="chip"><ha-icon icon="mdi:lightbulb-group"></ha-icon>${num(variables.ligados)} ligados</div>
+            <div class="chip"><span class="ponto ${on ? 'on' : 'off'}"></span>Wi-Fi ${on ? num(variables.clientes) + ' disp.' : 'offline'}</div>`;
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: '"saudacao meteo" "hora meteo" "data data" "resumo resumo"'
+        - grid-template-columns: 1fr auto
+      card:
+        - padding: 24px
+        - overflow: hidden
+        - background: linear-gradient(120deg, rgba(124,77,255,0.55), rgba(0,150,200,0.40), rgba(255,64,129,0.40), rgba(124,77,255,0.55))
+        - background-size: 300% 300%
+        - animation: aurora 18s ease infinite
+        - border: 1px solid rgba(255, 255, 255, 0.15)
+      custom_fields:
+        saudacao:
+          - justify-self: start
+          - font-size: 16px
+          - opacity: 0.85
+        hora:
+          - justify-self: start
+          - font-size: 64px
+          - font-weight: 700
+          - letter-spacing: -3px
+          - line-height: 1.05
+          - text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35)
+        data:
+          - justify-self: start
+          - font-size: 15px
+          - text-transform: capitalize
+          - opacity: 0.8
+        meteo:
+          - align-self: start
+          - display: flex
+          - align-items: center
+          - gap: 6px
+          - font-size: 28px
+          - font-weight: 300
+        resumo:
+          - justify-self: stretch
+          - display: flex
+          - flex-wrap: wrap
+          - gap: 8px
+          - margin-top: 18px
+    extra_styles: |
+      @keyframes aurora { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+      @keyframes pulsar { 0% { box-shadow: 0 0 0 0 rgba(105,240,174,.7); } 70% { box-shadow: 0 0 0 8px rgba(105,240,174,0); } 100% { box-shadow: 0 0 0 0 rgba(105,240,174,0); } }
+      #meteo ha-icon { --mdc-icon-size: 40px; }
+      .chip { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
+              background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.14);
+              font-size: 14px; font-weight: 600; }
+      .chip ha-icon { --mdc-icon-size: 18px; }
+      .ponto { width: 9px; height: 9px; border-radius: 50%; }
+      .ponto.on { background: #69f0ae; animation: pulsar 2s infinite; }
+      .ponto.off { background: #ff5252; }
+
+  # ------------------------------------------------------------------
+  #  Estado da rede Ruijie
+  # ------------------------------------------------------------------
+  rede:
+    template: vidro
+    triggers_update: all
+    variables:
+      clientes: sensor.ruijie_ap_clientes
+      download: sensor.ruijie_ap_download
+      upload: sensor.ruijie_ap_upload
+      uptime: sensor.ruijie_ap_uptime
+    icon: mdi:access-point
+    name: Ruijie AP
+    show_state: false
+    show_label: true
+    tap_action:
+      action: more-info
+    label: |
+      [[[
+        const on = entity && entity.state === 'on';
+        return `<span class="ponto ${on ? 'on' : 'off'}"></span>${on ? 'Online' : 'Offline'}`;
+      ]]]
+    custom_fields:
+      dados: |
+        [[[
+          const v = (id, d) => { const s = states[id]; const n = s ? parseFloat(s.state) : NaN; return isNaN(n) ? '—' : n.toLocaleString('pt-PT', { maximumFractionDigits: d }); };
+          const item = (i, val, u, txt) => `<div class="item"><ha-icon icon="mdi:${i}"></ha-icon><b>${val}</b><small>${u}</small><span>${txt}</span></div>`;
+          return item('devices', v(variables.clientes, 0), '', 'clientes')
+               + item('download', v(variables.download, 1), 'Mbit/s', 'download')
+               + item('upload', v(variables.upload, 1), 'Mbit/s', 'upload')
+               + item('timer-outline', v(variables.uptime, 1), 'd', 'ativo');
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: '"i n" "i l" "dados dados"'
+        - grid-template-columns: min-content 1fr
+        - column-gap: 14px
+      card:
+        - padding: 20px
+        - background: linear-gradient(135deg, rgba(0,229,255,0.22), rgba(124,77,255,0.12))
+      img_cell:
+        - width: 56px
+        - height: 56px
+        - border-radius: 18px
+        - background: rgba(0, 229, 255, 0.9)
+        - box-shadow: 0 0 24px rgba(0, 229, 255, 0.7)
+      icon:
+        - width: 30px
+        - color: "#10111f"
+      name:
+        - justify-self: start
+        - font-size: 18px
+        - font-weight: 700
+      label:
+        - justify-self: start
+        - display: flex
+        - align-items: center
+        - gap: 6px
+        - font-size: 13px
+      custom_fields:
+        dados:
+          - display: grid
+          - grid-template-columns: repeat(4, 1fr)
+          - gap: 8px
+          - margin-top: 18px
+    state:
+      - value: "off"
+        styles:
+          card:
+            - background: linear-gradient(135deg, rgba(255,82,82,0.25), rgba(255,82,82,0.05))
+          img_cell:
+            - background: rgba(255, 82, 82, 0.9)
+            - box-shadow: 0 0 24px rgba(255, 82, 82, 0.7)
+    extra_styles: |
+      @keyframes pulsar { 0% { box-shadow: 0 0 0 0 rgba(105,240,174,.7); } 70% { box-shadow: 0 0 0 8px rgba(105,240,174,0); } 100% { box-shadow: 0 0 0 0 rgba(105,240,174,0); } }
+      .ponto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+      .ponto.on { background: #69f0ae; animation: pulsar 2s infinite; }
+      .ponto.off { background: #ff5252; }
+      .item { display: flex; flex-direction: column; align-items: flex-start; padding: 10px;
+              border-radius: 16px; background: rgba(0,0,0,.22); }
+      .item ha-icon { --mdc-icon-size: 18px; color: #00e5ff; margin-bottom: 4px; }
+      .item b { font-size: 20px; }
+      .item small { font-size: 11px; opacity: .6; }
+      .item span { font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: .5px; }
+
+
+# =====================================================================
+#  VISTAS
+# =====================================================================
+views:
+
+  # -------------------------------------------------------------------
+  - title: Início
+    path: inicio
+    icon: mdi:home-variant
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            template: cabecalho
+            grid_options:
+              columns: full
+              rows: auto
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            template: acao
+            name: Cheguei
+            icon: mdi:home-heart
+            variables:
+              cor: "105, 240, 174"
+            tap_action:
+              action: perform-action
+              perform_action: script.casa_cheguei
+              haptic: success
+            grid_options: { columns: 3, rows: auto }
+          - type: custom:button-card
+            template: acao
+            name: Conforto 22°
+            icon: mdi:sofa
+            variables:
+              cor: "0, 200, 255"
+            tap_action:
+              action: perform-action
+              perform_action: script.casa_conforto
+              haptic: success
+            grid_options: { columns: 3, rows: auto }
+          - type: custom:button-card
+            template: acao
+            name: Modo noite
+            icon: mdi:weather-night
+            variables:
+              cor: "124, 77, 255"
+            tap_action:
+              action: perform-action
+              perform_action: script.casa_noite
+              haptic: success
+            grid_options: { columns: 3, rows: auto }
+          - type: custom:button-card
+            template: acao
+            name: Sair de casa
+            icon: mdi:exit-run
+            variables:
+              cor: "255, 64, 129"
+            tap_action:
+              action: perform-action
+              perform_action: script.casa_sair
+              haptic: warning
+              confirmation:
+                text: Desligar tudo, desligar o ar condicionado e fechar os estores?
+            grid_options: { columns: 3, rows: auto }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Luzes
+            icon: mdi:lightbulb-group
+            badges:
+              - type: entity
+                entity: sensor.casa_dispositivos_ligados
+          - type: custom:button-card
+            template: luz
+            entity: light.sala
+            name: Sala
+            icon: mdi:ceiling-light
+            grid_options: { columns: 6, rows: auto }
+          - type: custom:button-card
+            template: luz
+            entity: light.cozinha
+            name: Cozinha
+            icon: mdi:light-recessed
+            grid_options: { columns: 6, rows: auto }
+          - type: custom:button-card
+            template: luz
+            entity: light.quarto
+            name: Quarto
+            icon: mdi:bed
+            grid_options: { columns: 6, rows: auto }
+          - type: custom:button-card
+            template: luz
+            entity: switch.sonoff_jardim
+            name: Jardim
+            icon: mdi:outdoor-lamp
+            grid_options: { columns: 6, rows: auto }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Tomadas
+            icon: mdi:power-socket-eu
+            badges:
+              - type: entity
+                entity: sensor.casa_consumo_total
+          - type: custom:button-card
+            template: tomada
+            entity: switch.shelly_maquina_lavar
+            name: Máquina
+            icon: mdi:washing-machine
+            variables:
+              potencia: sensor.shelly_maquina_lavar_power
+            grid_options: { columns: 6, rows: auto }
+          - type: custom:button-card
+            template: tomada
+            entity: switch.shelly_termoacumulador
+            name: Termo
+            icon: mdi:water-boiler
+            variables:
+              potencia: sensor.shelly_termoacumulador_power
+            grid_options: { columns: 6, rows: auto }
+          - type: tile
+            entity: cover.shelly_estore_sala
+            name: Estore sala
+            features_position: bottom
+            vertical: false
+            features:
+              - type: cover-open-close
+            grid_options: { columns: 6, rows: 2 }
+          - type: tile
+            entity: cover.shelly_estore_quarto
+            name: Estore quarto
+            features_position: bottom
+            vertical: false
+            features:
+              - type: cover-open-close
+            grid_options: { columns: 6, rows: 2 }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Clima
+            icon: mdi:air-conditioner
+          - type: custom:button-card
+            template: clima
+            entity: climate.ac_sala
+            name: Sala
+            grid_options: { columns: 12, rows: auto }
+          - type: tile
+            entity: climate.ac_sala
+            name: Sala
+            hide_state: true
+            features_position: inline
+            vertical: false
+            features:
+              - type: target-temperature
+            grid_options: { columns: 12, rows: 1 }
+          - type: custom:button-card
+            template: clima
+            entity: climate.ac_quarto
+            name: Quarto
+            grid_options: { columns: 12, rows: auto }
+          - type: tile
+            entity: climate.ac_quarto
+            name: Quarto
+            hide_state: true
+            features_position: inline
+            vertical: false
+            features:
+              - type: target-temperature
+            grid_options: { columns: 12, rows: 1 }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Rede
+            icon: mdi:wifi
+          - type: custom:button-card
+            template: rede
+            entity: binary_sensor.ruijie_ap
+            grid_options: { columns: 12, rows: auto }
+
+  # -------------------------------------------------------------------
+  - title: Clima
+    path: clima
+    icon: mdi:thermostat
+    type: sections
+    max_columns: 2
+    sections:
+
+      - type: grid
+        cards:
+          - type: custom:button-card
+            template: clima
+            entity: climate.ac_sala
+            name: Sala
+            grid_options: { columns: 12, rows: auto }
+          - type: thermostat
+            entity: climate.ac_sala
+            show_current_as_primary: true
+            features:
+              - type: climate-hvac-modes
+                style: icons
+                hvac_modes: ["off", cool, heat, dry, fan_only, auto]
+              - type: climate-fan-modes
+                style: dropdown
+          - type: custom:mini-graph-card
+            name: Temperatura sala · 24 h
+            icon: mdi:thermometer
+            hours_to_show: 24
+            points_per_hour: 4
+            line_width: 3
+            animate: true
+            show: { fill: fade, extrema: true, labels: false }
+            entities:
+              - entity: climate.ac_sala
+                attribute: current_temperature
+                name: Atual
+                color: "#00e5ff"
+              - entity: climate.ac_sala
+                attribute: temperature
+                name: Alvo
+                color: "#ff4081"
+                show_fill: false
+                smoothing: false
+
+      - type: grid
+        cards:
+          - type: custom:button-card
+            template: clima
+            entity: climate.ac_quarto
+            name: Quarto
+            grid_options: { columns: 12, rows: auto }
+          - type: thermostat
+            entity: climate.ac_quarto
+            show_current_as_primary: true
+            features:
+              - type: climate-hvac-modes
+                style: icons
+                hvac_modes: ["off", cool, heat, dry, fan_only, auto]
+              - type: climate-fan-modes
+                style: dropdown
+          - type: custom:mini-graph-card
+            name: Temperatura quarto · 24 h
+            icon: mdi:thermometer
+            hours_to_show: 24
+            points_per_hour: 4
+            line_width: 3
+            animate: true
+            show: { fill: fade, extrema: true, labels: false }
+            entities:
+              - entity: climate.ac_quarto
+                attribute: current_temperature
+                name: Atual
+                color: "#00e5ff"
+              - entity: climate.ac_quarto
+                attribute: temperature
+                name: Alvo
+                color: "#ff4081"
+                show_fill: false
+                smoothing: false
+
+  # -------------------------------------------------------------------
+  - title: Energia
+    path: energia
+    icon: mdi:lightning-bolt
+    type: sections
+    max_columns: 3
+    sections:
+
+      - type: grid
+        column_span: 3
+        cards:
+          - type: custom:button-card
+            template: kpi
+            entity: sensor.casa_consumo_total
+            name: Agora
+            icon: mdi:flash
+            variables: { cor1: "#00e5ff", cor2: "#7c4dff" }
+            grid_options: { columns: 4, rows: auto }
+          - type: custom:button-card
+            template: kpi
+            entity: sensor.casa_energia_hoje
+            name: Hoje
+            icon: mdi:lightning-bolt-circle
+            variables: { cor1: "#b388ff", cor2: "#ff4081", casas: 2 }
+            grid_options: { columns: 4, rows: auto }
+          - type: custom:button-card
+            template: kpi
+            entity: sensor.casa_custo_hoje
+            name: Custo hoje
+            icon: mdi:cash
+            variables: { cor1: "#69f0ae", cor2: "#00e5ff", casas: 2 }
+            grid_options: { columns: 4, rows: auto }
+
+      - type: grid
+        cards:
+          - type: gauge
+            entity: sensor.casa_consumo_total
+            name: Potência instantânea
+            min: 0
+            max: 6900          # <-- potência contratada (W)
+            needle: true
+            segments:
+              - { from: 0, color: "#00e5ff" }
+              - { from: 2000, color: "#7c4dff" }
+              - { from: 4000, color: "#ff9100" }
+              - { from: 5500, color: "#ff1744" }
+            grid_options: { columns: 12, rows: auto }
+          - type: entities
+            entities:
+              - entity: input_number.casa_preco_kwh
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:mini-graph-card
+            name: Consumo da casa · 24 h
+            icon: mdi:home-lightning-bolt
+            hours_to_show: 24
+            points_per_hour: 6
+            line_width: 3
+            height: 180
+            animate: true
+            show: { fill: fade, extrema: true, average: true, labels: false }
+            entities:
+              - entity: sensor.casa_consumo_total
+            color_thresholds:
+              - { value: 0, color: "#00e5ff" }
+              - { value: 1000, color: "#7c4dff" }
+              - { value: 2500, color: "#ff9100" }
+              - { value: 4000, color: "#ff1744" }
+          - type: custom:mini-graph-card
+            name: Por equipamento · 12 h
+            icon: mdi:chart-line
+            hours_to_show: 12
+            points_per_hour: 6
+            line_width: 2
+            animate: true
+            show: { fill: false, legend: true, labels: false }
+            entities:
+              - entity: sensor.shelly_maquina_lavar_power
+                name: Máquina
+                color: "#00e5ff"
+              - entity: sensor.shelly_termoacumulador_power
+                name: Termo
+                color: "#ff4081"
+
+  # -------------------------------------------------------------------
+  - title: Rede
+    path: rede
+    icon: mdi:wifi
+    type: sections
+    max_columns: 2
+    sections:
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:button-card
+            template: rede
+            entity: binary_sensor.ruijie_ap
+            grid_options: { columns: full, rows: auto }
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:mini-graph-card
+            name: Tráfego do AP · 6 h
+            icon: mdi:swap-vertical
+            hours_to_show: 6
+            points_per_hour: 30
+            line_width: 2
+            height: 170
+            animate: true
+            show: { fill: fade, legend: true, labels: false }
+            entities:
+              - entity: sensor.ruijie_ap_download
+                name: Download
+                color: "#00e5ff"
+              - entity: sensor.ruijie_ap_upload
+                name: Upload
+                color: "#ff4081"
+          - type: custom:mini-graph-card
+            name: Dispositivos ligados · 24 h
+            icon: mdi:devices
+            hours_to_show: 24
+            points_per_hour: 2
+            line_width: 3
+            animate: true
+            show: { graph: bar, labels: false }
+            entities:
+              - entity: sensor.ruijie_ap_clientes
+                color: "#7c4dff"

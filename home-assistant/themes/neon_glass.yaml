@@ -1,0 +1,70 @@
+# Tema "Neon Glass" — fundo aurora escuro, cartões de vidro fosco.
+# O desfoque (backdrop-filter) nos cartões nativos precisa do card-mod;
+# sem ele o tema funciona na mesma, só sem o efeito de vidro.
+neon_glass:
+  card-mod-theme: neon_glass
+
+  # Fundo
+  lovelace-background: >-
+    radial-gradient(1200px 600px at 10% -10%, rgba(124, 77, 255, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(0, 229, 255, 0.25), transparent 60%),
+    radial-gradient(900px 700px at 50% 120%, rgba(255, 64, 129, 0.18), transparent 60%),
+    linear-gradient(160deg, #07070f 0%, #0d1024 55%, #080812 100%) fixed
+  primary-background-color: "#0a0b16"
+  secondary-background-color: "#12142a"
+
+  # Texto e cores base
+  primary-color: "#7c4dff"
+  accent-color: "#00e5ff"
+  primary-text-color: "#f2f3ff"
+  secondary-text-color: "rgba(242, 243, 255, 0.6)"
+  disabled-text-color: "rgba(242, 243, 255, 0.3)"
+  divider-color: "rgba(255, 255, 255, 0.08)"
+  rgb-primary-color: "124, 77, 255"
+  rgb-accent-color: "0, 229, 255"
+
+  # Barra superior transparente
+  app-header-background-color: "rgba(10, 11, 22, 0.55)"
+  app-header-text-color: "#f2f3ff"
+  app-header-edit-background-color: "#1d1f3a"
+  sidebar-background-color: "#0a0b16"
+  sidebar-icon-color: "rgba(242, 243, 255, 0.55)"
+  sidebar-selected-icon-color: "#00e5ff"
+  sidebar-selected-text-color: "#00e5ff"
+
+  # Cartões
+  card-background-color: "rgba(255, 255, 255, 0.05)"
+  ha-card-background: "rgba(255, 255, 255, 0.05)"
+  ha-card-border-color: "rgba(255, 255, 255, 0.08)"
+  ha-card-border-width: "1px"
+  ha-card-border-radius: "24px"
+  ha-card-box-shadow: "0 8px 32px rgba(0, 0, 0, 0.35)"
+  ha-dialog-border-radius: "28px"
+  mdc-theme-surface: "#14162c"
+  dialog-backdrop-filter: "blur(12px)"
+
+  # Cores de estado
+  state-icon-color: "rgba(242, 243, 255, 0.6)"
+  state-light-on-color: "#ffb74d"
+  state-switch-on-color: "#00e5ff"
+  state-cover-open-color: "#b388ff"
+  state-climate-cool-color: "#00c8ff"
+  state-climate-heat-color: "#ff7840"
+  state-climate-dry-color: "#82aaff"
+  state-climate-fan_only-color: "#b48cff"
+  state-climate-auto-color: "#69f0ae"
+  state-climate-heat_cool-color: "#69f0ae"
+  energy-grid-consumption-color: "#7c4dff"
+
+  # Controlos
+  switch-checked-color: "#00e5ff"
+  slider-color: "#7c4dff"
+  paper-slider-knob-color: "#7c4dff"
+  mdc-theme-primary: "#7c4dff"
+
+  # Vidro fosco em todos os cartões nativos (requer card-mod)
+  card-mod-card: |
+    ha-card {
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+    }

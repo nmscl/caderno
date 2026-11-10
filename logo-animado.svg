@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Elo Docente">
+  <!-- Elo Docente · © 2026 Nuno Lopes. Todos os direitos reservados. -->
+  <style>
+    .telhado {
+      fill: none; stroke: #fff; stroke-width: 44; stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 1; stroke-dashoffset: 0;
+      transform-box: fill-box; transform-origin: 50% 100%;
+      animation: desenhar .7s cubic-bezier(.65,0,.35,1) .15s backwards,
+                 pousar 5s cubic-bezier(.34,1.56,.64,1) 2.6s infinite;
+    }
+    .barra {
+      transform-box: fill-box; transform-origin: 50% 100%;
+      animation: crescer .65s cubic-bezier(.34,1.56,.64,1) backwards,
+                 onda 5s ease-in-out infinite;
+    }
+    .b1 { animation-delay: .70s, 2.60s; }
+    .b2 { animation-delay: .82s, 2.72s; }
+    .b3 { animation-delay: .94s, 2.84s; }
+    .b4 { animation-delay: 1.06s, 2.96s; }
+
+    @keyframes desenhar {
+      0%   { stroke-dashoffset: 1; opacity: 0; }
+      10%  { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 1; }
+    }
+    @keyframes crescer {
+      0%   { transform: scaleY(0); opacity: 0; }
+      30%  { opacity: 1; }
+      100% { transform: scaleY(1); opacity: 1; }
+    }
+    @keyframes onda {
+      0%, 16%, 100% { transform: translateY(0) scaleY(1); }
+      6%            { transform: translateY(-12px) scaleY(1.04); }
+      11%           { transform: translateY(3px) scaleY(.97); }
+    }
+    @keyframes pousar {
+      0%, 9%, 24%, 100% { transform: translateY(0); }
+      15%               { transform: translateY(-10px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .telhado, .barra { animation: none; }
+    }
+  </style>
+
+  <rect width="512" height="512" rx="112" fill="#10284b"/>
+  <path class="telhado" pathLength="1" d="M112 228 256 118 400 228"/>
+  <rect class="barra b1" x="106" y="280" width="48" height="146" rx="24" fill="#5b9be0"/>
+  <rect class="barra b2" x="190" y="280" width="48" height="146" rx="24" fill="#3ec4b0"/>
+  <rect class="barra b3" x="274" y="280" width="48" height="146" rx="24" fill="#f2b14a"/>
+  <rect class="barra b4" x="358" y="280" width="48" height="146" rx="24" fill="#a98fd8"/>
+</svg>
